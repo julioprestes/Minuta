@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Minuta.Cli/Minuta.Cli.csproj" />
+    <Project Path="src/Minuta.Core/Minuta.Core.csproj" />
+    <Project Path="src/Minuta.Desktop/Minuta.Desktop.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Minuta.Core.Tests/Minuta.Core.Tests.csproj" />
+  </Folder>
+</Solution>
