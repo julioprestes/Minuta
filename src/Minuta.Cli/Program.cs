@@ -2,6 +2,7 @@
 using Minuta.Core;
 using Minuta.Core.Configuracao;
 using Minuta.Core.Midia;
+using Minuta.Core.Transcricoes;
 
 Console.OutputEncoding = Encoding.UTF8;
 
@@ -52,25 +53,31 @@ static async Task<int> ExecutarAsync(string[] args, CancellationToken cancelamen
 
     var video = ArquivoDeEntrada.Validar(args[0]);
     var pastaSaida = Path.GetFullPath(LerOpcao(args, "--saida") ?? video.DirectoryName!);
+    var opcoes = new OpcoesProcessamento(Retranscrever: args.Contains("--retranscrever"));
     var config = ConfiguracaoMinuta.Carregar();
-    var ffmpeg = LocalizadorFfmpeg.Localizar(config.FfmpegPath);
 
     Console.WriteLine($"Vídeo: {video.FullName} ({Megabytes(video.Length)})");
     Console.WriteLine($"Saída: {pastaSaida}");
     Console.WriteLine();
 
-    Console.WriteLine("[1/3] Extraindo o áudio...");
-    var audio = await new ExtratorAudio(ffmpeg).ExtrairAsync(video, pastaSaida, cancelamento);
-    Console.WriteLine($"      {audio.Caminho}");
-    Console.WriteLine($"      {Megabytes(audio.Bytes)}, duração {FormatarDuracao(audio.Duracao)}");
+    using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+    var resultado = await new ProcessadorMinuta(config, http)
+        .ProcessarAsync(video, pastaSaida, opcoes, new ProgressoNoConsole(), cancelamento);
 
-    Console.WriteLine("[2/3] Transcrição: ainda não implementada (Fase 1, etapa 3).");
-    Console.WriteLine("[3/3] Análise e documento: ainda não implementados (Fase 1, etapas 4 e 5).");
+    var t = resultado.Transcricao;
+    Console.WriteLine();
+    Console.WriteLine($"Transcrição: {t.Segmentos.Count} trechos, duração {FormatarDuracao(t.Duracao)}"
+        + (t.SegmentosDescartados > 0 ? $", {t.SegmentosDescartados} trecho(s) de silêncio/ruído descartado(s)" : "")
+        + (t.Segmentos.Any(s => s.BaixaConfianca) ? $", {t.Segmentos.Count(s => s.BaixaConfianca)} com baixa confiança (?)" : "")
+        + ".");
+    Console.WriteLine($"  {resultado.CaminhoTranscricaoTexto}");
+    Console.WriteLine();
+    Console.WriteLine("Início:");
+    foreach (var linha in t.ParaTextoComTempos().Split(Environment.NewLine).Take(5))
+        Console.WriteLine($"  {linha}");
 
-    var pendencias = config.Pendencias();
-    if (pendencias.Count > 0)
-        Console.WriteLine($"\nAviso: a configuração tem {pendencias.Count} pendência(s) para as próximas etapas. Rode \"minuta --checar\".");
-
+    Console.WriteLine();
+    Console.WriteLine("Análise e documento: ainda não implementados (Fase 1, etapas 4 e 5).");
     return 0;
 }
 
@@ -138,8 +145,18 @@ static void MostrarAjuda()
         Minuta — transforma vídeos de reunião em documento .md para o desenvolvimento.
 
         Uso:
-          minuta <video> [--saida <pasta>]   processa o vídeo (padrão: saída na pasta do vídeo)
-          minuta --checar                    confere chaves, modelos e FFmpeg
-          minuta --ajuda                     mostra esta ajuda
+          minuta <video> [opções]   processa o vídeo
+          minuta --checar           confere chaves, modelos e FFmpeg
+          minuta --ajuda            mostra esta ajuda
+
+        Opções:
+          --saida <pasta>     onde gravar os arquivos (padrão: pasta do vídeo)
+          --retranscrever     ignora a transcrição já salva e transcreve de novo
         """);
+}
+
+/// <summary>Escreve o progresso na hora, na ordem (o Progress&lt;T&gt; padrão pode trocar a ordem no console).</summary>
+sealed class ProgressoNoConsole : IProgress<string>
+{
+    public void Report(string valor) => Console.WriteLine($"• {valor}");
 }
