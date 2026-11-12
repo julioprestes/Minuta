@@ -1,0 +1,57 @@
+# Decisões do projeto
+
+Registro do porquê das escolhas, para retomar o trabalho em qualquer máquina. Datas no formato AAAA-MM-DD.
+
+## 2026-11-12 — Arquitetura
+
+- **Biblioteca + clientes.** Toda a lógica fica em `Minuta.Core`. O console (`Minuta.Cli`) e a interface WPF (`Minuta.Desktop`) só chamam a biblioteca. O pipeline fica em `ProcessadorMinuta`, não no console.
+- **WPF movido para `src/Minuta.Desktop`.** Com o `.csproj` na raiz, ele compilaria os `.cs` dos outros projetos (o SDK inclui todas as subpastas).
+- **Sem pacotes externos no Core.** `HttpClient`, `System.Text.Json` e um leitor próprio de `.env`. Só o projeto de testes usa xUnit.
+- **Duas trilhas, três papéis.** Trilha de áudio e trilha visual (Fase 3) viram uma linha do tempo `[mm:ss]`. Papéis:
+  - Transcritor: Whisper no Groq.
+  - Redator: LLM no OpenRouter.
+  - Visão: modelo multimodal.
+  Cada papel tem modelo configurável.
+- **O modelo devolve JSON, o código escreve o Markdown.** O formato fica estável e as citações podem ser conferidas contra a transcrição.
+
+## 2026-11-12 — Transcrição: Whisper (Groq), não um LLM multimodal
+
+- Avaliado: `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` (aceita áudio no OpenRouter). Descartado para a transcrição porque:
+  - não devolve tempos reais, só estimados;
+  - pode resumir ou reescrever a fala;
+  - não aceita saída estruturada;
+  - é um modelo de raciocínio (mais lento);
+  - divide a cota de 50 requisições por dia.
+- A regra "cada card cita o trecho que o justifica" depende de uma transcrição **independente e fiel**. Se o mesmo modelo ouve e resume, ele confere a si mesmo.
+- O Whisper no Groq tem plano gratuito. Os US$ 0,111/h são do plano pago; um vídeo de 10 min seria cerca de US$ 0,02.
+- O Omni continua candidato para a **trilha visual** (aceita vídeo direto), assim como o `thinkingmachines/inkling-2-small:free` (aceita imagem, mas não JSON Schema).
+
+## 2026-11-12 — Áudio
+
+- Extração em **Opus, mono, 16 kHz, 32 kbps** (`.audio.ogg`). O Whisper reduz tudo a 16 kHz mono de qualquer forma. Fica em cerca de 2 MB a cada 10 min (medido: 10 min = 2,1 MB).
+- Limite de upload do Groq gratuito: **25 MB**, cerca de 1h40 de áudio. Acima disso, erro claro; a divisão do áudio é a Fase 2.
+- **Silêncio descartado** com o critério do Whisper original (`no_speech_prob > 0,6` e `avg_logprob < -1`). Isso evita frases inventadas em trechos mudos.
+- **Baixa confiança** marcada com `(?)` quando `avg_logprob < -1` ou `compression_ratio > 2,4`.
+- A transcrição é salva (`.transcricao.json` e `.txt`) e **reaproveitada** se o vídeo não mudou (nome, tamanho e data), para não gastar cota a cada ajuste de prompt. `--retranscrever` força uma nova.
+
+## 2026-11-12 — Produto: núcleo geral, perfis de documento
+
+- O Minuta é **projeto pessoal e genérico** (portfólio). Nada de empresa ou cliente real no repositório; testes só com vídeos simulados.
+- Uma extração geral; o **perfil** escolhe as seções, a ênfase do prompt e o modelo do Markdown.
+  - No repositório: *Análise para desenvolvimento* e *Ata de reunião*; depois *Relato de erro*.
+  - Perfis personalizados (ex.: o formato de uma empresa) ficam em **pasta local fora do git**.
+- Não separamos quem fala: o foco é o resumo geral, e nos vídeos de análise normalmente só uma pessoa fala. Citações no formato `[Vídeo mm:ss]`.
+- Nova ordem das fases: reuniões comuns só precisam de áudio longo + perfil *Ata*, o que é mais barato que a trilha visual.
+
+## 2026-11-12 — Privacidade
+
+- **Groq:** não guarda dados por padrão; pode registrar entradas por até 30 dias (diagnóstico e abuso). Retenção Zero (ZDR) disponível em Data Controls, em qualquer plano. Dados nos EUA.
+- **OpenRouter:** não guarda prompts por padrão, mas vale a política do provedor de cada modelo. Modelos gratuitos podem registrar ou treinar com os dados.
+- Para uso com dados reais: plano com retenção zero, provedor aprovado pela organização ou o **modo local** (Whisper local + modelo local), planejado para depois.
+
+## Limites dos planos gratuitos (consultados em 2026-11-12)
+
+| Provedor | Limite |
+|---|---|
+| Groq Whisper | 20 req/min, 2.000 req/dia, 2 h de áudio por hora, 8 h por dia (fontes secundárias; conferir em console.groq.com/settings/limits) |
+| OpenRouter `:free` | 20 req/min; 50 req/dia com menos de US$ 10 em créditos já comprados, 1.000/dia com pelo menos US$ 10 |

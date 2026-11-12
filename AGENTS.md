@@ -27,9 +27,30 @@ Não comece uma fase antes de a anterior funcionar.
    - **modo local** (Whisper local + modelo local, nada sai da máquina);
    - gravação/captura direta pelo app, com registro real dos cliques.
 
+## Estado atual
+Atualize esta seção ao fim de cada etapa. O porquê das escolhas está em [docs/DECISOES.md](docs/DECISOES.md).
+
+**Fase 1, em andamento:**
+- ✅ Etapa 1, estrutura: solução com Core, Cli, Desktop e testes; configuração por `.env`; `minuta --checar`.
+- ✅ Etapa 2, áudio: `ExtratorAudio` (ffprobe confere o arquivo; ffmpeg gera Opus mono 16 kHz em `<video>.audio.ogg`).
+- ✅ Etapa 3, transcrição: `TranscritorGroq` (Whisper, `verbose_json`, descarte de silêncio, novas tentativas). Salva `<video>.transcricao.json` e `.txt` e reaproveita se o vídeo não mudou (`--retranscrever` refaz). Testada com chave real em vídeo fictício.
+- ⏭️ **Etapa 4, análise:**
+  - enviar a transcrição `[mm:ss]` ao OpenRouter e pedir **JSON com schema**: resumo, decisões, regras de negócio, dúvidas em aberto, passos para reproduzir, próximos passos e cards, cada item com citação (tempo + trecho literal);
+  - o código confere cada citação contra a transcrição e marca com ⚠ a que não bater;
+  - modelo previsto: `nvidia/nemotron-3.5-super-vl:free` (aceita saída estruturada);
+  - tratar 401, 429, 5xx, falha de rede e JSON inválido, como no Groq;
+  - entrar no `ProcessadorMinuta`.
+- Etapa 5, documento: montar o `.md` a partir do JSON com os perfis *Análise para desenvolvimento* e *Ata de reunião* (`--perfil analise|ata`); testes do gerador e da conferência de citações.
+
+**Para rodar numa máquina nova:**
+1. Instalar o .NET 10 SDK e o FFmpeg (`winget install Gyan.FFmpeg`, depois abrir um terminal novo).
+2. Copiar `.env.example` para `.env` e preencher as chaves.
+3. Rodar `dotnet test` e `dotnet run --project src/Minuta.Cli -- --checar`.
+
 ## Regras de trabalho
 - Plano curto primeiro; código só depois da aprovação do desenvolvedor.
 - Uma etapa por vez. Ao terminar: parar, dizer como testar e sugerir a mensagem de commit.
+- **Só comece a próxima etapa com liberação explícita** ("pode fazer"). Mostrar uma chave configurada ou um teste rodando não é liberação.
 - Antes de decidir sobre um provedor de IA, consultar a documentação oficial atual (custos, limites, tamanho máximo de arquivo, tratamento dos dados).
 - Chaves só em variáveis de ambiente ou `.env`. `.env` no `.gitignore`; manter `.env.example` atualizado.
 - **Não inventar.** O que não estiver no vídeo vira dúvida em aberto. Cada card cita o trecho (com tempo) que o justifica, e o código confere a citação contra a transcrição.
