@@ -23,9 +23,10 @@ Não comece uma fase antes de a anterior funcionar.
 3. **Trilha visual:** frames escolhidos por mudança de tela, por menção na fala ("aqui", "clico em") e por intervalo, analisados por modelo multimodal e somados à linha do tempo. Também cobre vídeos sem áudio.
 4. **Interface desktop** simples (WPF).
 5. Depois:
+   - **importar transcrição pronta** como entrada, no lugar do Whisper: Claude Meetings (reuniões ao vivo) e arquivos de legenda/transcrição. O Whisper continua para os vídeos. Substitui a ideia de capturar reuniões ao vivo pelo app;
    - provedores configuráveis (ex.: API da Anthropic direto);
    - **modo local** (Whisper local + modelo local, nada sai da máquina);
-   - gravação/captura direta pelo app, com registro real dos cliques.
+   - gravação de tela pelo app, com registro real dos cliques (vídeos de análise, não reuniões).
 
 ## Estado atual
 Atualize esta seção ao fim de cada etapa. O porquê das escolhas está em [docs/DECISOES.md](docs/DECISOES.md).

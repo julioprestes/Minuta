@@ -49,6 +49,22 @@ Registro do porquê das escolhas, para retomar o trabalho em qualquer máquina. 
 - **OpenRouter:** não guarda prompts por padrão, mas vale a política do provedor de cada modelo. Modelos gratuitos podem registrar ou treinar com os dados.
 - Para uso com dados reais: plano com retenção zero, provedor aprovado pela organização ou o **modo local** (Whisper local + modelo local), planejado para depois.
 
+## 2026-11-13 — Claude Meetings: complemento, não concorrente
+
+- A Anthropic lançou o **Claude Meetings** (beta, 2026-11-10/12).
+  - **O que faz:** entra ao vivo em chamadas do Google Meet, toma notas e gera ações; guarda transcrição, resumo e descrições de tela, sem o áudio.
+  - **Disponibilidade:** só nos planos Team e Enterprise e fora de organizações com retenção zero.
+  - **Convidados externos:** por padrão, não fica em chamadas com eles.
+- **Não cobre o caso central do Minuta:**
+  - vídeos **já gravados**, de qualquer ferramenta;
+  - o analista gravando sozinho o fluxo na tela;
+  - documentos para desenvolvimento com citações conferidas.
+- **Decisão:** em vez de capturar reuniões ao vivo pelo app (ideia antiga), o Minuta vai **importar uma transcrição pronta** como entrada alternativa ao Whisper: a do Claude Meetings e, de forma geral, arquivos de transcrição ou legenda. O Whisper continua para os vídeos. A análise, os perfis e a conferência de citações são os mesmos para as duas entradas.
+- **A investigar quando chegar a hora:**
+  - como obter a transcrição do Claude Meetings fora do claude.ai (exportação manual ou API);
+  - se ela traz tempos por trecho (necessários para as citações `[mm:ss]`).
+- A gravação de tela pelo app com registro dos cliques continua nos planos: ela é para vídeos de análise, não para reuniões.
+
 ## Limites dos planos gratuitos (consultados em 2026-11-12)
 
 | Provedor | Limite |

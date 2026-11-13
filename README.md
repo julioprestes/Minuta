@@ -34,7 +34,7 @@ Perfis personalizados podem ficar em pasta local, fora do repositório.
 | 2 | Áudio longo (divisão acima do limite de upload) | planejada |
 | 3 | Trilha visual: frames por mudança de tela e por menção na fala, analisados por modelo multimodal | planejada |
 | 4 | Interface desktop (WPF) | planejada |
-| depois | Provedores configuráveis, **modo local** (nada sai da máquina), gravação direta pelo app | ideias |
+| depois | Importar transcrição pronta (ex.: Claude Meetings) no lugar do Whisper, provedores configuráveis, **modo local** (nada sai da máquina), gravação de tela com registro dos cliques | ideias |
 
 ## Estrutura
 
