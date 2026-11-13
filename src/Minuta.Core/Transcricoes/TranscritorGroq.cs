@@ -72,6 +72,8 @@ public sealed class TranscritorGroq(HttpClient http, string apiKey, string model
     /// Converte o verbose_json em <see cref="Transcricao"/>. Aplica o mesmo critério do Whisper original para
     /// descartar silêncio (no_speech_prob &gt; 0,6 e avg_logprob &lt; -1), o que evita frases inventadas em
     /// trechos sem fala, e marca baixa confiança quando avg_logprob &lt; -1 ou compression_ratio &gt; 2,4.
+    /// Também descarta trechos que são quase só uma frase curta repetida (alucinação com ruído) e marca
+    /// como baixa confiança os que têm uma repetição dessas no meio de fala real.
     /// </summary>
     internal static Transcricao Interpretar(string corpo, string modelo, string idioma)
     {
@@ -102,18 +104,55 @@ public sealed class TranscritorGroq(HttpClient http, string apiKey, string model
             // O Whisper às vezes cola frases ("estoque.A regra"); devolve o espaço depois da pontuação.
             var texto = FrasesColadas.Replace(s.Text?.Trim() ?? "", "$1 ");
             var silencio = s.NoSpeechProb > 0.6 && s.AvgLogprob < -1.0;
-            if (texto.Length == 0 || silencio)
+            var repeticao = CoberturaDeRepeticao(texto);
+            if (texto.Length == 0 || silencio || repeticao >= CoberturaParaDescartar)
             {
                 descartados++;
                 continue;
             }
 
-            var baixaConfianca = s.AvgLogprob < -1.0 || s.CompressionRatio > 2.4;
+            var baixaConfianca = s.AvgLogprob < -1.0 || s.CompressionRatio > 2.4 || repeticao > 0;
             segmentos.Add(new SegmentoTranscricao(
                 TimeSpan.FromSeconds(s.Start), TimeSpan.FromSeconds(s.End), texto, baixaConfianca));
         }
 
         return new Transcricao(modelo, idioma, duracao, segmentos, descartados);
+    }
+
+    /// <summary>Mínimo de repetições seguidas de uma mesma frase curta para contar como alucinação.</summary>
+    internal const int RepeticoesMinimas = 4;
+
+    /// <summary>Trecho em que a repetição cobre ao menos esta fração das palavras é descartado como ruído.</summary>
+    internal const double CoberturaParaDescartar = 0.8;
+
+    private const int PalavrasMaximasDaFrase = 4;
+
+    /// <summary>
+    /// Com ruído sem fala (teclado, cliques), o Whisper às vezes repete uma frase curta ("E aí E aí E aí...").
+    /// Procura a maior sequência de uma frase de 1 a 4 palavras repetida ao menos <see cref="RepeticoesMinimas"/>
+    /// vezes seguidas e devolve a fração das palavras do trecho que ela ocupa (0 = sem repetição suspeita).
+    /// Acentos, maiúsculas e pontuação são ignorados.
+    /// </summary>
+    internal static double CoberturaDeRepeticao(string texto)
+    {
+        var palavras = Analises.ConferenciaCitacoes.Normalizar(texto).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var maior = 0;
+
+        for (var n = 1; n <= PalavrasMaximasDaFrase; n++)
+        {
+            for (var inicio = 0; inicio + n * RepeticoesMinimas <= palavras.Length; inicio++)
+            {
+                var repeticoes = 1;
+                while (inicio + (repeticoes + 1) * n <= palavras.Length
+                       && palavras.AsSpan(inicio, n).SequenceEqual(palavras.AsSpan(inicio + repeticoes * n, n)))
+                    repeticoes++;
+
+                if (repeticoes >= RepeticoesMinimas)
+                    maior = Math.Max(maior, repeticoes * n);
+            }
+        }
+
+        return palavras.Length == 0 ? 0 : (double)maior / palavras.Length;
     }
 
     private sealed record RespostaGroq(

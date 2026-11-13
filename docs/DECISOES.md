@@ -89,6 +89,21 @@ Registro do porquê das escolhas, para retomar o trabalho em qualquer máquina. 
 - **Cache:** o prompt usado fica salvo na transcrição. Se o glossário mudar, o vídeo é transcrito de novo (e, por consequência, analisado de novo).
 - **Teste** (vídeo fictício, glossário com 3 termos, nenhum deles falado): o texto saiu idêntico, sem termos inventados. Os trechos ficaram menores (7 → 10), o que deixa os tempos das citações mais precisos.
 
+## 2026-11-13 — Filtro de repetição (alucinação com ruído)
+
+- **Problema:** num vídeo real, o barulho do teclado virou "E aí E aí E aí…" (18 vezes) num trecho de 20 s. O Groq não marcou esse trecho como silêncio nem como baixa confiança, então os critérios do Whisper não pegaram.
+- **Solução no código:** procurar a maior sequência de uma frase de 1 a 4 palavras repetida **4 ou mais vezes seguidas**, ignorando acentos, maiúsculas e pontuação.
+  - Se a repetição cobre **80% ou mais** das palavras do trecho, ele é descartado e contado como ruído, junto com o silêncio.
+  - Se cobre menos (fala real com repetição no meio), o trecho fica, marcado com `(?)`.
+- "Não, não, não" (3 vezes) não conta como repetição.
+- O filtro roda ao interpretar a resposta do Groq: transcrições já salvas só mudam com `--retranscrever`.
+
+## 2026-11-13 — Letras cortadas num trecho (hipótese, a confirmar)
+
+- No mesmo vídeo, um trecho longo, de fala rápida, perdeu as letras a partir do acento ("até" → "at", "não" → "n").
+- **Hipótese:** o erro vem do Whisper, não do Minuta. O resto da mesma resposta tem acentos normais, e um erro de leitura do texto trocaria caracteres ("Ã©") em todos os trechos, em vez de sumir com letras num só.
+- **A fazer, se voltar a acontecer:** guardar a resposta bruta do Groq para diagnóstico e comparar com `whisper-large-v3-turbo`.
+
 ## 2026-11-13 — Documento (Fase 1, etapa 5)
 
 - **O código escreve o Markdown** a partir de `.analise.json`. Trocar de perfil ou ajustar o formato não chama API; o documento é sempre refeito.

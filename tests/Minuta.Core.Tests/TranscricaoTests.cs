@@ -245,3 +245,43 @@ public class ArquivoTranscricaoTests
         Assert.Null(ArquivoTranscricao.Carregar(json, video));
     }
 }
+
+public class RepeticaoAlucinadaTests
+{
+    [Theory]
+    [InlineData("E aí E aí E aí E aí E aí E aí E aí E aí E aí E aí E aí E aí")]
+    [InlineData("Obrigado. Obrigado. Obrigado. Obrigado. Obrigado.")]
+    [InlineData("Legendas pela comunidade, legendas pela comunidade, legendas pela comunidade, legendas pela comunidade")]
+    public void Frase_curta_repetida_ocupa_o_trecho_todo(string texto)
+    {
+        Assert.True(TranscritorGroq.CoberturaDeRepeticao(texto) >= TranscritorGroq.CoberturaParaDescartar);
+    }
+
+    [Theory]
+    [InlineData("Não, não, não, aqui é outra tela.")]
+    [InlineData("Quando eu clico em salvar, aparece a mensagem de estoque insuficiente.")]
+    [InlineData("")]
+    public void Fala_normal_nao_conta_como_repeticao(string texto)
+    {
+        Assert.Equal(0, TranscritorGroq.CoberturaDeRepeticao(texto));
+    }
+
+    [Fact]
+    public void Descarta_trecho_repetido_e_marca_o_que_mistura_fala_real()
+    {
+        const string corpo = """
+            {"text":"...","duration":30.0,"segments":[
+              {"start":0,"end":8,"text":" Então o relatório não abriu, vou tentar de novo.","avg_logprob":-0.2,"no_speech_prob":0.01,"compression_ratio":1.2},
+              {"start":8,"end":20,"text":" E aí E aí E aí E aí E aí E aí E aí E aí","avg_logprob":-0.3,"no_speech_prob":0.2,"compression_ratio":1.9},
+              {"start":20,"end":30,"text":" Bom, por algum motivo o relatório da tela de pedidos não está abrindo de jeito nenhum, sim sim sim sim.","avg_logprob":-0.2,"no_speech_prob":0.01,"compression_ratio":1.3}
+            ]}
+            """;
+
+        var t = TranscritorGroq.Interpretar(corpo, "whisper-large-v3", "pt");
+
+        Assert.Equal(2, t.Segmentos.Count);
+        Assert.Equal(1, t.SegmentosDescartados);
+        Assert.False(t.Segmentos[0].BaixaConfianca);
+        Assert.True(t.Segmentos[1].BaixaConfianca);
+    }
+}
