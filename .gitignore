@@ -487,3 +487,5 @@ CLAUDE.md
 *.transcricao.json
 *.transcricao.txt
 *.audio.ogg
+*.analise.json
+glossario.txt

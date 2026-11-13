@@ -1,0 +1,11 @@
+# Glossário do Minuta: termos que o Whisper costuma errar.
+# Copie para glossario.txt (fica fora do git) e troque pelos termos do seu dia a dia.
+# Um termo por linha; linhas com # são ignoradas. Cabem uns 500 caracteres no total.
+# Mudar o glossário faz o vídeo ser transcrito (e analisado) de novo.
+nota fiscal
+pedido de venda
+ordem de compra
+CNPJ
+CFOP
+boleto
+centro de custo

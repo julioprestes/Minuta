@@ -12,6 +12,7 @@ public sealed record ConfiguracaoMinuta
     public const string VarModeloAnalise = "OPENROUTER_MODELO_ANALISE";
     public const string VarIdioma = "MINUTA_IDIOMA";
     public const string VarFfmpegPath = "FFMPEG_PATH";
+    public const string VarGlossario = "MINUTA_GLOSSARIO";
 
     public const string ModeloTranscricaoPadrao = "whisper-large-v3";
     public const string IdiomaPadrao = "pt";
@@ -28,6 +29,12 @@ public sealed record ConfiguracaoMinuta
 
     /// <summary>Caminho do ffmpeg.exe ou da pasta que o contém. Vazio = procurar no PATH.</summary>
     public string? FfmpegPath { get; init; }
+
+    /// <summary>
+    /// Caminho do glossário do Whisper. Vem de MINUTA_GLOSSARIO (relativo à pasta do .env) ou, sem ela,
+    /// do glossario.txt ao lado do .env, se existir. Null = sem glossário.
+    /// </summary>
+    public string? CaminhoGlossario { get; init; }
 
     /// <summary>Caminho do .env usado, ou null se nenhum foi encontrado.</summary>
     public string? ArquivoEnvUsado { get; init; }
@@ -50,6 +57,12 @@ public sealed record ConfiguracaoMinuta
             return string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();
         }
 
+        var pastaBase = caminhoEnv is null ? diretorioInicial : Path.GetDirectoryName(caminhoEnv)!;
+        var glossarioPadrao = Path.Combine(pastaBase, Transcricoes.Glossario.NomeArquivoPadrao);
+        var caminhoGlossario = Ler(VarGlossario) is { } g
+            ? Path.GetFullPath(g.Trim('"'), pastaBase)
+            : File.Exists(glossarioPadrao) ? glossarioPadrao : null;
+
         return new ConfiguracaoMinuta
         {
             GroqApiKey = Ler(VarGroqApiKey),
@@ -58,6 +71,7 @@ public sealed record ConfiguracaoMinuta
             ModeloAnalise = Ler(VarModeloAnalise),
             Idioma = Ler(VarIdioma) ?? IdiomaPadrao,
             FfmpegPath = Ler(VarFfmpegPath),
+            CaminhoGlossario = caminhoGlossario,
             ArquivoEnvUsado = caminhoEnv,
         };
     }

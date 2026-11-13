@@ -31,17 +31,21 @@ Não comece uma fase antes de a anterior funcionar.
 ## Estado atual
 Atualize esta seção ao fim de cada etapa. O porquê das escolhas está em [docs/DECISOES.md](docs/DECISOES.md).
 
-**Fase 1, em andamento:**
+**Fase 1, concluída:**
 - ✅ Etapa 1, estrutura: solução com Core, Cli, Desktop e testes; configuração por `.env`; `minuta --checar`.
 - ✅ Etapa 2, áudio: `ExtratorAudio` (ffprobe confere o arquivo; ffmpeg gera Opus mono 16 kHz em `<video>.audio.ogg`).
 - ✅ Etapa 3, transcrição: `TranscritorGroq` (Whisper, `verbose_json`, descarte de silêncio, novas tentativas). Salva `<video>.transcricao.json` e `.txt` e reaproveita se o vídeo não mudou (`--retranscrever` refaz). Testada com chave real em vídeo fictício.
-- ⏭️ **Etapa 4, análise:**
-  - enviar a transcrição `[mm:ss]` ao OpenRouter e pedir **JSON com schema**: resumo, decisões, regras de negócio, dúvidas em aberto, passos para reproduzir, próximos passos e cards, cada item com citação (tempo + trecho literal);
-  - o código confere cada citação contra a transcrição e marca com ⚠ a que não bater;
-  - modelo previsto: `nvidia/nemotron-3.5-super-vl:free` (aceita saída estruturada);
-  - tratar 401, 429, 5xx, falha de rede e JSON inválido, como no Groq;
-  - entrar no `ProcessadorMinuta`.
-- Etapa 5, documento: montar o `.md` a partir do JSON com os perfis *Análise para desenvolvimento* e *Ata de reunião* (`--perfil analise|ata`); testes do gerador e da conferência de citações.
+- ✅ Etapa 4, análise: `RedatorOpenRouter` (JSON Schema estrito, `require_parameters`, novas tentativas via `ChamadorComTentativas`, compartilhado com o Groq).
+  - `ConferenciaCitacoes` acha cada trecho na transcrição (sem acentos nem pontuação) e corrige o tempo.
+  - Salva `<video>.analise.json` e reaproveita (`--reanalisar` refaz; mudar `VersaoPrompt` invalida).
+  - Testada com `nvidia/nemotron-3.5-super-vl:free`: 12 de 12 citações conferidas.
+- ✅ Glossário do Whisper: `glossario.txt` local (ou `MINUTA_GLOSSARIO`), enviado no `prompt`; até 500 caracteres; mudar o glossário refaz a transcrição.
+- ✅ Etapa 5, documento: `GeradorDocumento` monta `<video>.minuta.md` a partir da análise, com os perfis `analise` (padrão) e `ata` (`--perfil`). Seções vazias não aparecem; tempos `[mm:ss]` e ⚠ para citação não conferida. O console mostra só a contagem e o caminho.
+
+**Próximos passos possíveis** (cada um precisa de liberação):
+- Ajustes do prompt (`VersaoPrompt` 2): observação não vira passo; sugestão separada de decisão.
+- Perfis personalizados lidos de pasta local fora do git.
+- Fase 2 (áudio longo) ou Fase 3 (trilha visual).
 
 **Para rodar numa máquina nova:**
 1. Instalar o .NET 10 SDK e o FFmpeg (`winget install Gyan.FFmpeg`, depois abrir um terminal novo).

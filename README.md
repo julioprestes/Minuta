@@ -4,7 +4,7 @@ Transforma gravações de reuniões e de tela em um documento Markdown curto e p
 
 Feito para quem recebe vídeos de explicação (análise de requisitos, relato de erro, reunião) e precisa trabalhar a partir de texto: pesquisar, copiar trechos e não assistir tudo de novo.
 
-> Em desenvolvimento. Fase 1 (console, vídeos com áudio) em andamento.
+> Em desenvolvimento. Fase 1 (console, vídeos com áudio) concluída.
 
 ## Como funciona
 
@@ -20,8 +20,8 @@ linha do tempo ─▶ modelo de linguagem (OpenRouter) ─▶ JSON validado ─�
 
 | Perfil | Para |
 |---|---|
-| Análise para desenvolvimento | resumo, regras de negócio, requisitos, dúvidas e cards de tarefa |
-| Ata de reunião | decisões, ações (quem / o quê / prazo, quando ditos) e pendências |
+| Análise para desenvolvimento (`--perfil analise`, padrão) | resumo, passos para reproduzir, regras de negócio, decisões, dúvidas, cards de tarefa e próximos passos |
+| Ata de reunião (`--perfil ata`) | resumo, decisões, próximos passos e pendências |
 | Relato de erro *(planejado)* | passos para reproduzir, esperado × obtido |
 
 Perfis personalizados podem ficar em pasta local, fora do repositório.
@@ -30,7 +30,7 @@ Perfis personalizados podem ficar em pasta local, fora do repositório.
 
 | Fase | Entrega | Situação |
 |---|---|---|
-| 1 | Console: vídeo com áudio → transcrição → documento, perfis *Análise* e *Ata* | em andamento |
+| 1 | Console: vídeo com áudio → transcrição → documento, perfis *Análise* e *Ata* | concluída |
 | 2 | Áudio longo (divisão acima do limite de upload) | planejada |
 | 3 | Trilha visual: frames por mudança de tela e por menção na fala, analisados por modelo multimodal | planejada |
 | 4 | Interface desktop (WPF) | planejada |
@@ -58,7 +58,12 @@ Copie `.env.example` para `.env` e preencha as chaves.
 ```bash
 dotnet run --project src/Minuta.Cli -- --checar
 dotnet run --project src/Minuta.Cli -- caminho/do/video.mp4
+dotnet run --project src/Minuta.Cli -- caminho/do/video.mp4 --perfil ata
 ```
+
+Ao lado do vídeo ficam `video.minuta.md` (o documento), `video.transcricao.txt` e os arquivos de cache (`.transcricao.json`, `.analise.json`). Transcrição e análise são reaproveitadas: trocar de perfil não chama nenhuma API (`--retranscrever` e `--reanalisar` refazem).
+
+**Glossário (opcional).** Se o Whisper erra siglas ou nomes do seu dia a dia, liste os termos certos em `glossario.txt` ao lado do `.env`, um por linha (modelo em `glossario.exemplo.txt`). O arquivo fica fora do git. Mudar o glossário faz o vídeo ser transcrito de novo.
 
 ## Testes
 

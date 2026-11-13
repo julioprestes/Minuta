@@ -23,6 +23,9 @@ public sealed record Transcricao(
 {
     public OrigemTranscricao? Origem { get; init; }
 
+    /// <summary>Prompt do glossário usado na transcrição (null = sem glossário). Mudou o glossário, transcreve de novo.</summary>
+    public string? Glossario { get; init; }
+
     public bool Vazia => Segmentos.All(s => string.IsNullOrWhiteSpace(s.Texto));
 
     /// <summary>Uma linha por trecho: "[mm:ss] texto". Trechos de baixa confiança terminam com "(?)".</summary>
@@ -59,10 +62,10 @@ public static class ArquivoTranscricao
     }
 
     /// <summary>
-    /// Lê a transcrição salva, se ela existir, estiver íntegra e for do mesmo vídeo (nome, tamanho e data).
-    /// Caso contrário retorna null e o vídeo é transcrito de novo.
+    /// Lê a transcrição salva, se ela existir, estiver íntegra, for do mesmo vídeo (nome, tamanho e data)
+    /// e tiver usado o mesmo glossário. Caso contrário retorna null e o vídeo é transcrito de novo.
     /// </summary>
-    public static Transcricao? Carregar(string caminhoJson, FileInfo video)
+    public static Transcricao? Carregar(string caminhoJson, FileInfo video, string? promptGlossario = null)
     {
         if (!File.Exists(caminhoJson))
             return null;
@@ -70,7 +73,9 @@ public static class ArquivoTranscricao
         try
         {
             var salva = JsonSerializer.Deserialize<Transcricao>(File.ReadAllText(caminhoJson), Opcoes);
-            return salva?.Origem == OrigemTranscricao.De(video) && salva.Segmentos is not null ? salva : null;
+            return salva?.Origem == OrigemTranscricao.De(video)
+                && salva.Glossario == promptGlossario
+                && salva.Segmentos is not null ? salva : null;
         }
         catch (JsonException)
         {

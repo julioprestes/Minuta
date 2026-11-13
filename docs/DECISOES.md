@@ -40,7 +40,7 @@ Registro do porquê das escolhas, para retomar o trabalho em qualquer máquina. 
 - Uma extração geral; o **perfil** escolhe as seções, a ênfase do prompt e o modelo do Markdown.
   - No repositório: *Análise para desenvolvimento* e *Ata de reunião*; depois *Relato de erro*.
   - Perfis personalizados (ex.: o formato de uma empresa) ficam em **pasta local fora do git**.
-- Não separamos quem fala: o foco é o resumo geral, e nos vídeos de análise normalmente só uma pessoa fala. Citações no formato `[Vídeo mm:ss]`.
+- Não separamos quem fala: o foco é o resumo geral, e nos vídeos de análise normalmente só uma pessoa fala. Citações no formato `[mm:ss]`, o mesmo da transcrição em `.txt`.
 - Nova ordem das fases: reuniões comuns só precisam de áudio longo + perfil *Ata*, o que é mais barato que a trilha visual.
 
 ## 2026-11-12 — Privacidade
@@ -48,6 +48,20 @@ Registro do porquê das escolhas, para retomar o trabalho em qualquer máquina. 
 - **Groq:** não guarda dados por padrão; pode registrar entradas por até 30 dias (diagnóstico e abuso). Retenção Zero (ZDR) disponível em Data Controls, em qualquer plano. Dados nos EUA.
 - **OpenRouter:** não guarda prompts por padrão, mas vale a política do provedor de cada modelo. Modelos gratuitos podem registrar ou treinar com os dados.
 - Para uso com dados reais: plano com retenção zero, provedor aprovado pela organização ou o **modo local** (Whisper local + modelo local), planejado para depois.
+
+## 2026-11-13 — Análise (Fase 1, etapa 4)
+
+- **Saída estruturada estrita.** `response_format: json_schema` com `strict: true` e `provider.require_parameters: true`, para o OpenRouter só usar provedores que respeitam o schema. O schema é escrito sem `$ref`, porque nem todo provedor aceita.
+- **Um JSON geral** (resumo, decisões, regras, dúvidas, passos, próximos passos, cards), igual para todos os perfis. Cada item traz citações `{tempo, trecho literal}`.
+- **Conferência no código, não confiança no modelo.**
+  - O trecho é procurado na transcrição, ignorando acentos, maiúsculas e pontuação, e pode atravessar segmentos.
+  - Achou: o tempo passa a ser o do segmento real.
+  - Não achou: a citação fica marcada como não conferida (⚠).
+  - Trechos com menos de 8 caracteres não contam.
+- **Dúvidas podem não ter citação:** muitas vezes são justamente o que não foi dito. Os outros itens exigem citação.
+- **JSON fora do formato** é pedido de novo uma vez antes de dar erro. A resposta cortada por tamanho (`finish_reason: length`) é tratada.
+- **Cache da análise** (`.analise.json`) por vídeo, modelo e `VersaoPrompt`, para ajustar o documento (etapa 5) sem gastar a cota de 50 requisições por dia.
+- **Teste real** (vídeo fictício de 1 min, `nemotron-3.5-super-vl:free`): 13 s; 12 de 12 citações conferidas. O modelo levantou como dúvidas o que não foi dito (reservas, quantidades) em vez de inventar.
 
 ## 2026-11-13 — Claude Meetings: complemento, não concorrente
 
@@ -64,6 +78,28 @@ Registro do porquê das escolhas, para retomar o trabalho em qualquer máquina. 
   - como obter a transcrição do Claude Meetings fora do claude.ai (exportação manual ou API);
   - se ela traz tempos por trecho (necessários para as citações `[mm:ss]`).
 - A gravação de tela pelo app com registro dos cliques continua nos planos: ela é para vídeos de análise, não para reuniões.
+
+## 2026-11-13 — Glossário do Whisper
+
+- **Problema:** num vídeo real, o Whisper ouviu um termo do domínio errado (trocou por palavras parecidas). Siglas e nomes de telas sofrem mais.
+- **Solução:** campo `prompt` da transcrição. A documentação do Groq diz que ele serve para "guiar o estilo ou indicar a grafia de palavras incomuns", aceita até **224 tokens** e deve estar no idioma do áudio.
+- **Arquivo local:** `glossario.txt` ao lado do `.env` ou o caminho em `MINUTA_GLOSSARIO`. Fica fora do git porque os termos costumam ser da empresa ou do cliente. O repositório só tem `glossario.exemplo.txt`, com termos genéricos.
+- **Formato:** um termo por linha, `#` para comentário. O prompt enviado é `Glossário: termo1, termo2.`
+- **Limite:** 500 caracteres, abaixo dos 224 tokens por segurança, já que o tokenizador não está disponível aqui. O que passa disso fica de fora, com aviso.
+- **Cache:** o prompt usado fica salvo na transcrição. Se o glossário mudar, o vídeo é transcrito de novo (e, por consequência, analisado de novo).
+- **Teste** (vídeo fictício, glossário com 3 termos, nenhum deles falado): o texto saiu idêntico, sem termos inventados. Os trechos ficaram menores (7 → 10), o que deixa os tempos das citações mais precisos.
+
+## 2026-11-13 — Documento (Fase 1, etapa 5)
+
+- **O código escreve o Markdown** a partir de `.analise.json`. Trocar de perfil ou ajustar o formato não chama API; o documento é sempre refeito.
+- **Perfil = dados:** id, título e lista de seções (tipo, título, estilo: marcadores, numerada ou tarefas). Isso prepara a leitura de perfis personalizados de uma pasta local.
+  - `analise`: resumo, passos para reproduzir, regras, decisões, dúvidas, cards e próximos passos.
+  - `ata`: resumo, decisões, próximos passos e pendências.
+- **Seções vazias não aparecem**, para o documento ficar curto.
+- **Itens:** texto em uma linha com os tempos `[mm:ss]` no fim. ⚠ marca citação não conferida ou citação obrigatória ausente. Dúvida sem citação aparece como *(não dito no vídeo)*.
+- **Cards:** descrição, critérios de aceite como checklist e o trecho literal que os originou.
+- **Cabeçalho:** vídeo, duração, data, modelos e quantas citações foram conferidas. **Rodapé:** legenda das marcas e o nome do `.txt` da transcrição.
+- **Saída:** `<video>.minuta.md`, sobrescrito a cada execução (já está no `.gitignore`).
 
 ## Limites dos planos gratuitos (consultados em 2026-11-12)
 

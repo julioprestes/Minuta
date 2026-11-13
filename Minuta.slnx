@@ -4,6 +4,7 @@
     <File Path=".gitignore" />
     <File Path="AGENTS.md" />
     <File Path="docs/DECISOES.md" />
+    <File Path="glossario.exemplo.txt" />
     <File Path="README.md" />
   </Folder>
   <Folder Name="/src/">

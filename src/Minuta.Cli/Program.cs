@@ -1,6 +1,8 @@
 ﻿using System.Text;
 using Minuta.Core;
+using Minuta.Core.Analises;
 using Minuta.Core.Configuracao;
+using Minuta.Core.Documentos;
 using Minuta.Core.Midia;
 using Minuta.Core.Transcricoes;
 
@@ -53,7 +55,10 @@ static async Task<int> ExecutarAsync(string[] args, CancellationToken cancelamen
 
     var video = ArquivoDeEntrada.Validar(args[0]);
     var pastaSaida = Path.GetFullPath(LerOpcao(args, "--saida") ?? video.DirectoryName!);
-    var opcoes = new OpcoesProcessamento(Retranscrever: args.Contains("--retranscrever"));
+    var opcoes = new OpcoesProcessamento(
+        Retranscrever: args.Contains("--retranscrever"),
+        Reanalisar: args.Contains("--reanalisar"),
+        Perfil: PerfisDocumento.Obter(LerOpcao(args, "--perfil") ?? PerfisDocumento.Analise.Id));
     var config = ConfiguracaoMinuta.Carregar();
 
     Console.WriteLine($"Vídeo: {video.FullName} ({Megabytes(video.Length)})");
@@ -71,14 +76,29 @@ static async Task<int> ExecutarAsync(string[] args, CancellationToken cancelamen
         + (t.Segmentos.Any(s => s.BaixaConfianca) ? $", {t.Segmentos.Count(s => s.BaixaConfianca)} com baixa confiança (?)" : "")
         + ".");
     Console.WriteLine($"  {resultado.CaminhoTranscricaoTexto}");
-    Console.WriteLine();
-    Console.WriteLine("Início:");
-    foreach (var linha in t.ParaTextoComTempos().Split(Environment.NewLine).Take(5))
-        Console.WriteLine($"  {linha}");
+
+    MostrarAnalise(resultado.Analise, resultado.CaminhoAnalise);
 
     Console.WriteLine();
-    Console.WriteLine("Análise e documento: ainda não implementados (Fase 1, etapas 4 e 5).");
+    Console.WriteLine($"Documento ({opcoes.Perfil!.Titulo}):");
+    Console.WriteLine($"  {resultado.CaminhoDocumento}");
     return 0;
+}
+
+// O conteúdo vai para o .md; aqui só a contagem e o que precisa de atenção.
+static void MostrarAnalise(AnaliseVideo a, string caminho)
+{
+    Console.WriteLine();
+    Console.WriteLine($"Análise ({a.Modelo}):");
+    Console.WriteLine($"  {caminho}");
+    Console.WriteLine($"  {a.PassosParaReproduzir.Count} passo(s), {a.RegrasNegocio.Count} regra(s), {a.Decisoes.Count} decisão(ões), "
+        + $"{a.DuvidasEmAberto.Count} dúvida(s), {a.Cards.Count} card(s), {a.ProximosPassos.Count} próximo(s) passo(s).");
+
+    var citacoes = a.TodasAsCitacoes.ToList();
+    var naoConferidas = citacoes.Where(c => !c.Conferida).ToList();
+    Console.WriteLine($"  Citações conferidas na transcrição: {citacoes.Count - naoConferidas.Count} de {citacoes.Count}.");
+    foreach (var c in naoConferidas)
+        Console.WriteLine($"  ⚠ não encontrada: \"{c.Trecho}\"");
 }
 
 static int Checar()
@@ -92,6 +112,7 @@ static int Checar()
     Console.WriteLine($"  {ConfiguracaoMinuta.VarOpenRouterApiKey,-26}{Status(config.OpenRouterApiKey)}");
     Console.WriteLine($"  {ConfiguracaoMinuta.VarModeloAnalise,-26}{config.ModeloAnalise ?? "(não definido)"}");
     Console.WriteLine($"  {ConfiguracaoMinuta.VarIdioma,-26}{config.Idioma}");
+    Console.WriteLine($"  {"Glossário",-26}{DescreverGlossario(config.CaminhoGlossario)}");
 
     var ok = true;
     try
@@ -119,6 +140,17 @@ static int Checar()
 
     Console.WriteLine(ok ? "Tudo pronto." : "Há pendências (veja acima).");
     return ok ? 0 : 1;
+}
+
+static string DescreverGlossario(string? caminho)
+{
+    if (caminho is null)
+        return $"(nenhum; opcional, crie {Glossario.NomeArquivoPadrao} ao lado do .env)";
+    if (!File.Exists(caminho))
+        return $"NÃO ENCONTRADO — {caminho}";
+    var g = Glossario.Carregar(caminho);
+    return $"{caminho} ({g.Termos.Count} termo(s)"
+        + (g.TermosIgnorados.Count > 0 ? $", {g.TermosIgnorados.Count} fora do limite" : "") + ")";
 }
 
 // Nunca exibe a chave, nem parte dela.
@@ -150,8 +182,10 @@ static void MostrarAjuda()
           minuta --ajuda            mostra esta ajuda
 
         Opções:
+          --perfil <nome>     formato do documento: analise (padrão) ou ata
           --saida <pasta>     onde gravar os arquivos (padrão: pasta do vídeo)
           --retranscrever     ignora a transcrição já salva e transcreve de novo
+          --reanalisar        ignora a análise já salva e chama o modelo de novo
         """);
 }
 
