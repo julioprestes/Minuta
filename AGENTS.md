@@ -3,7 +3,9 @@
 ## Objetivo
 Transformar gravações de reuniões e de tela em um documento `.md` curto, pesquisável e fiel ao que foi dito e mostrado: resumo, decisões, regras de negócio, dúvidas em aberto, passos para reproduzir um erro, próximos passos e cards de tarefa.
 
-Caso de uso principal: vídeos em que alguém **mostra um fluxo de sistema e fala sobre ele** (análise de requisitos, relato de erro). O núcleo é geral e também serve para reuniões comuns.
+Caso de uso principal: vídeos em que alguém **mostra um fluxo de sistema e fala sobre ele** (análise de requisitos, relato de erro). O documento é **para desenvolvimento**.
+
+**Reuniões ao vivo não são o foco:** ferramentas como o Claude Meetings já fazem notas e ações. O Minuta complementa: para reuniões, a prioridade é **importar a transcrição pronta** e gerar o documento de desenvolvimento a partir dela. O perfil *Ata* fica simples e secundário (sem investir em ênfase de prompt nem em campos de responsável e prazo).
 
 ## Arquitetura
 ```
@@ -12,14 +14,14 @@ vídeo ─▶ trilha de áudio (FFmpeg ─▶ Transcritor) ─┐
 ```
 - **Transcritor:** Whisper via Groq. **Redator:** modelo via OpenRouter, com saída JSON validada. **Visão:** modelo multimodal (Fase 3). Cada papel tem modelo configurável no `.env`.
 - **Núcleo geral, perfil específico.** A extração é uma só (um JSON geral com citações). O **perfil** escolhe as seções, a ênfase do prompt e o modelo do Markdown.
-  - Perfis do repositório (genéricos): *Análise para desenvolvimento* e *Ata de reunião*; depois *Relato de erro*.
+  - Perfis do repositório (genéricos): *Análise para desenvolvimento* (principal) e *Ata de reunião* (secundário); depois *Relato de erro*.
   - Perfis personalizados ficam em pasta local ignorada pelo git.
 - Lógica em `Minuta.Core`; `Minuta.Cli` (console) e `Minuta.Desktop` (WPF) só a usam.
 
 ## Fases
-Não comece uma fase antes de a anterior funcionar.
+Não comece uma fase antes de a anterior funcionar. Exceção: a Fase 2 só entra quando houver necessidade, e a Fase 3 pode vir antes dela.
 1. **MVP (console):** vídeo COM áudio → áudio → transcrição → análise → `.md`, com os perfis *Análise para desenvolvimento* e *Ata de reunião*.
-2. **Áudio longo:** dividir o áudio acima do limite de upload e juntar as transcrições.
+2. **Áudio longo:** dividir o áudio acima do limite de upload e juntar as transcrições. Só quando houver necessidade: os vídeos de análise são curtos, e as reuniões longas tendem a vir por transcrição pronta.
 3. **Trilha visual:** frames escolhidos por mudança de tela, por menção na fala ("aqui", "clico em") e por intervalo, analisados por modelo multimodal e somados à linha do tempo. Também cobre vídeos sem áudio.
 4. **Interface desktop** simples (WPF).
 5. Depois:
@@ -44,10 +46,12 @@ Atualize esta seção ao fim de cada etapa. O porquê das escolhas está em [doc
 - ✅ Resposta bruta do Groq gravada em `<video>.groq.json` (diagnóstico). Em investigação: um trecho de vídeo real vem com letras cortadas a partir do acento (ver DECISOES).
 - ✅ Etapa 5, documento: `GeradorDocumento` monta `<video>.minuta.md` a partir da análise, com os perfis `analise` (padrão) e `ata` (`--perfil`). Seções vazias não aparecem; tempos `[mm:ss]` e ⚠ para citação não conferida. O console mostra só a contagem e o caminho.
 
-**Próximos passos possíveis** (cada um precisa de liberação):
-- Ajustes do prompt (`VersaoPrompt` 2): observação não vira passo; sugestão separada de decisão.
-- Perfis personalizados lidos de pasta local fora do git.
-- Fase 2 (áudio longo) ou Fase 3 (trilha visual).
+**Próximos passos, em ordem de prioridade** (cada um precisa de liberação):
+1. Ajustes do prompt para vídeos de análise (`VersaoPrompt` 2): observação não vira passo; sugestão separada de decisão.
+2. Perfis personalizados lidos de pasta local fora do git.
+3. Fase 3 (trilha visual).
+4. Importar transcrição pronta (Claude Meetings, `.vtt`/`.srt`) para reuniões.
+5. Fase 2 (áudio longo), se aparecer necessidade.
 
 **Para rodar numa máquina nova:**
 1. Instalar o .NET 10 SDK e o FFmpeg (`winget install Gyan.FFmpeg`, depois abrir um terminal novo).

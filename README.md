@@ -1,8 +1,10 @@
 # Minuta
 
-Transforma gravações de reuniões e de tela em um documento Markdown curto e pesquisável: resumo, decisões, regras de negócio, dúvidas em aberto, passos para reproduzir um erro, próximos passos e cards de tarefa — cada item citando o momento do vídeo que o justifica.
+Transforma vídeos gravados em um documento Markdown curto e pesquisável **para desenvolvimento**: resumo, passos para reproduzir um erro, regras de negócio, decisões, dúvidas em aberto, cards de tarefa com critérios de aceite e próximos passos. Cada item cita o momento do vídeo que o justifica.
 
-Feito para quem recebe vídeos de explicação (análise de requisitos, relato de erro, reunião) e precisa trabalhar a partir de texto: pesquisar, copiar trechos e não assistir tudo de novo.
+O foco são os **vídeos de análise e de relato de erro**: alguém mostra um fluxo de sistema na tela e fala sobre ele. Funciona com o arquivo, venha de onde vier (gravação de tela, vídeo enviado pelo cliente, Teams, Zoom, Meet, áudio).
+
+**E as reuniões ao vivo?** Ferramentas como o Claude Meetings já tomam notas e geram ações em chamadas ao vivo; o Minuta não compete com elas. Para reuniões, o plano é **importar a transcrição pronta** dessas ferramentas (ou um `.vtt`/`.srt`) e gerar a partir dela o mesmo documento de desenvolvimento, com as citações conferidas.
 
 > Em desenvolvimento. Fase 1 (console, vídeos com áudio) concluída.
 
@@ -21,8 +23,8 @@ linha do tempo ─▶ modelo de linguagem (OpenRouter) ─▶ JSON validado ─�
 | Perfil | Para |
 |---|---|
 | Análise para desenvolvimento (`--perfil analise`, padrão) | resumo, passos para reproduzir, regras de negócio, decisões, dúvidas, cards de tarefa e próximos passos |
-| Ata de reunião (`--perfil ata`) | resumo, decisões, próximos passos e pendências |
 | Relato de erro *(planejado)* | passos para reproduzir, esperado × obtido |
+| Ata de reunião (`--perfil ata`) | resumo, decisões, próximos passos e pendências (perfil simples, secundário) |
 
 Perfis personalizados podem ficar em pasta local, fora do repositório.
 
@@ -31,10 +33,12 @@ Perfis personalizados podem ficar em pasta local, fora do repositório.
 | Fase | Entrega | Situação |
 |---|---|---|
 | 1 | Console: vídeo com áudio → transcrição → documento, perfis *Análise* e *Ata* | concluída |
-| 2 | Áudio longo (divisão acima do limite de upload) | planejada |
-| 3 | Trilha visual: frames por mudança de tela e por menção na fala, analisados por modelo multimodal | planejada |
+| 2 | Áudio longo (divisão acima do limite de upload, ~1h40) | quando houver necessidade |
+| 3 | Trilha visual: frames por mudança de tela e por menção na fala, analisados por modelo multimodal | **prioridade** |
 | 4 | Interface desktop (WPF) | planejada |
-| depois | Importar transcrição pronta (ex.: Claude Meetings) no lugar do Whisper, provedores configuráveis, **modo local** (nada sai da máquina), gravação de tela com registro dos cliques | ideias |
+| depois | **Importar transcrição pronta** (Claude Meetings, `.vtt`/`.srt`) para reuniões, provedores configuráveis, **modo local** (nada sai da máquina), gravação de tela com registro dos cliques | ideias |
+
+Antes da Fase 3: ajustes do prompt para vídeos de análise e perfis personalizados lidos de pasta local.
 
 ## Estrutura
 

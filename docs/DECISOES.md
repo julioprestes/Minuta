@@ -126,6 +126,21 @@ Registro do porquê das escolhas, para retomar o trabalho em qualquer máquina. 
 - **Cabeçalho:** vídeo, duração, data, modelos e quantas citações foram conferidas. **Rodapé:** legenda das marcas e o nome do `.txt` da transcrição.
 - **Saída:** `<video>.minuta.md`, sobrescrito a cada execução (já está no `.gitignore`).
 
+## 2026-11-16 — Reposicionamento: foco em vídeos de análise
+
+- **Situação:** se a empresa usar o Claude Meetings, ele cobre a ata de reuniões ao vivo no Meet (notas, resumo e ações) melhor que o Minuta, sem precisar gravar e baixar arquivo. Não vale competir nisso.
+- **Onde o Minuta continua útil:**
+  - vídeos gravados, sobretudo de análise e relato de erro (tela + fala), de qualquer origem;
+  - Teams e Zoom (o Claude Meetings só atende o Meet);
+  - reuniões com convidados externos (por padrão, o Claude Meetings não entra nelas) e organizações sem plano Team/Enterprise;
+  - documento **para desenvolvimento**, com citações conferidas no código e formato fixo (perfil);
+  - no futuro, a trilha visual e o modo local.
+- **Decisões:**
+  - O perfil *Ata* fica simples e secundário, sem ênfase de prompt nem campos de responsável e prazo.
+  - Para reuniões, a prioridade passa a ser **importar a transcrição pronta** (Claude Meetings, `.vtt`/`.srt`).
+  - Nova ordem de prioridade: ajustes do prompt → perfis personalizados → Fase 3 (trilha visual) → importar transcrição → Fase 2 (áudio longo), esta só se houver necessidade.
+  - Isso substitui a ordem anterior (áudio longo antes da trilha visual), que fazia sentido quando reuniões comuns eram um caso central.
+
 ## Limites dos planos gratuitos (consultados em 2026-11-12)
 
 | Provedor | Limite |
