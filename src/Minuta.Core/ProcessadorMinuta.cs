@@ -107,10 +107,14 @@ public sealed class ProcessadorMinuta(ConfiguracaoMinuta config, HttpClient http
         var audio = await new ExtratorAudio(ffmpeg).ExtrairAsync(video, pastaSaida, cancelamento);
         progresso?.Report($"Áudio: {audio.Bytes / 1_000_000.0:N1} MB, duração {(audio.Duracao is { } d ? Transcricao.FormatarTempo(d) : "desconhecida")}.");
 
+        // Resposta do Groq como chegou, para diagnosticar erros de transcrição (ex.: texto cortado).
+        var caminhoRespostaBruta = Path.Combine(pastaSaida,
+            Path.GetFileNameWithoutExtension(video.Name) + ArquivoTranscricao.SufixoRespostaBruta);
+
         progresso?.Report($"Transcrevendo com {config.ModeloTranscricao} (Groq)...");
         var transcricao = await new TranscritorGroq(
                 http, config.GroqApiKey, config.ModeloTranscricao, config.Idioma, glossario?.Prompt)
-            .TranscreverAsync(audio.Caminho, cancelamento);
+            .TranscreverAsync(audio.Caminho, caminhoRespostaBruta, cancelamento);
         transcricao = transcricao with
         {
             Duracao = transcricao.Duracao ?? audio.Duracao,

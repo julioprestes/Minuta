@@ -285,3 +285,34 @@ public class RepeticaoAlucinadaTests
         Assert.True(t.Segmentos[1].BaixaConfianca);
     }
 }
+
+public class RespostaBrutaTests
+{
+    [Fact]
+    public async Task Grava_a_resposta_como_chegou()
+    {
+        using var temp = new PastaTemporaria();
+        const string corpo = """{"text":"Até então.","duration":1.0,"segments":[{"start":0,"end":1,"text":"Até então.","avg_logprob":-0.1,"no_speech_prob":0.01,"compression_ratio":1.0}]}""";
+        var handler = new HandlerFalso(() => HandlerFalso.Json(System.Net.HttpStatusCode.OK, corpo));
+        var bruta = Path.Combine(temp.Caminho, "v" + ArquivoTranscricao.SufixoRespostaBruta);
+
+        await new TranscritorGroq(new HttpClient(handler), "chave", "whisper-large-v3", "pt")
+            .TranscreverAsync(temp.CriarArquivo("v.audio.ogg"), bruta);
+
+        Assert.Equal(corpo, File.ReadAllText(bruta)); // sem reformatar: os é mostram o que a API mandou
+    }
+
+    [Fact]
+    public async Task Grava_mesmo_quando_a_resposta_e_invalida()
+    {
+        using var temp = new PastaTemporaria();
+        var handler = new HandlerFalso(() => HandlerFalso.Json(System.Net.HttpStatusCode.OK, "{ quebrado"));
+        var bruta = Path.Combine(temp.Caminho, "v" + ArquivoTranscricao.SufixoRespostaBruta);
+
+        await Assert.ThrowsAsync<MinutaException>(() =>
+            new TranscritorGroq(new HttpClient(handler), "chave", "whisper-large-v3", "pt")
+                .TranscreverAsync(temp.CriarArquivo("v.audio.ogg"), bruta));
+
+        Assert.Equal("{ quebrado", File.ReadAllText(bruta));
+    }
+}

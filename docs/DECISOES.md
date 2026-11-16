@@ -102,7 +102,17 @@ Registro do porquê das escolhas, para retomar o trabalho em qualquer máquina. 
 
 - No mesmo vídeo, um trecho longo, de fala rápida, perdeu as letras a partir do acento ("até" → "at", "não" → "n").
 - **Hipótese:** o erro vem do Whisper, não do Minuta. O resto da mesma resposta tem acentos normais, e um erro de leitura do texto trocaria caracteres ("Ã©") em todos os trechos, em vez de sumir com letras num só.
-- **A fazer, se voltar a acontecer:** guardar a resposta bruta do Groq para diagnóstico e comparar com `whisper-large-v3-turbo`.
+- **Turbo testado (2026-11-13):** o `whisper-large-v3-turbo` cortou o mesmo trecho, do mesmo jeito. Também errou mais nomes e perdeu 30 s de fala importante. Continuamos com o `whisper-large-v3`.
+  - A transcrição salva é ASCII puro nesse trecho: não há caractere escondido, as letras já não vieram.
+- **Resposta bruta (2026-11-16):** a cada transcrição, o Minuta grava `<video>.groq.json` exatamente como chegou, antes de interpretar e mesmo que seja inválida. O arquivo fica fora do git e o programa não o lê.
+  - Se o campo `text` (a transcrição inteira) vier certo e só o trecho vier cortado, é falha do Groq ao montar os trechos, e dá para corrigir o trecho a partir do `text`.
+  - Se o `text` também vier cortado, é o modelo: no máximo, marcar o trecho com `(?)`.
+- **Resultado do diagnóstico (2026-11-16):**
+  - O `text` da resposta bruta também vem cortado: o erro acontece dentro do Groq, não na montagem dos trechos nem no Minuta.
+  - **O mesmo pedaço de áudio (24 s), enviado sozinho, volta perfeito**, com e sem glossário ("até então a estrutura está ok… histórico… lá… não").
+  - **Conclusão:** o erro depende do contexto do áudio longo. O Whisper transcreve em janelas de 30 s condicionadas ao texto anterior, e uma janela "sem acentos" contamina o resto dela. Não é um problema da gravação.
+  - Os campos `seek` e `tokens` da resposta não batem com o texto do trecho; não servem para o diagnóstico.
+- **Decisão: não corrigir por enquanto.** Re-transcrever sozinhos os trechos suspeitos resolveria, mas a análise já entende o contexto mesmo com essas falhas, e o resumo sai correto. Fica como ideia caso o problema passe a prejudicar o documento.
 
 ## 2026-11-13 — Documento (Fase 1, etapa 5)
 

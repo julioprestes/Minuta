@@ -49,6 +49,9 @@ public static class ArquivoTranscricao
     public const string SufixoJson = ".transcricao.json";
     public const string SufixoTexto = ".transcricao.txt";
 
+    /// <summary>Resposta do Groq como chegou, só para diagnóstico (não é lida pelo programa).</summary>
+    public const string SufixoRespostaBruta = ".groq.json";
+
     private static readonly JsonSerializerOptions Opcoes = new()
     {
         WriteIndented = true,

@@ -41,6 +41,7 @@ Atualize esta seção ao fim de cada etapa. O porquê das escolhas está em [doc
   - Testada com `nvidia/nemotron-3.5-super-vl:free`: 12 de 12 citações conferidas.
 - ✅ Glossário do Whisper: `glossario.txt` local (ou `MINUTA_GLOSSARIO`), enviado no `prompt`; até 500 caracteres; mudar o glossário refaz a transcrição.
 - ✅ Filtro de repetição: trecho que é quase só uma frase curta repetida (≥ 4 vezes, ≥ 80% das palavras) é descartado como ruído; repetição menor marca `(?)`.
+- ✅ Resposta bruta do Groq gravada em `<video>.groq.json` (diagnóstico). Em investigação: um trecho de vídeo real vem com letras cortadas a partir do acento (ver DECISOES).
 - ✅ Etapa 5, documento: `GeradorDocumento` monta `<video>.minuta.md` a partir da análise, com os perfis `analise` (padrão) e `ata` (`--perfil`). Seções vazias não aparecem; tempos `[mm:ss]` e ⚠ para citação não conferida. O console mostra só a contagem e o caminho.
 
 **Próximos passos possíveis** (cada um precisa de liberação):

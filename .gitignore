@@ -489,3 +489,4 @@ CLAUDE.md
 *.audio.ogg
 *.analise.json
 glossario.txt
+*.groq.json

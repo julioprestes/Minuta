@@ -21,10 +21,17 @@ public sealed class TranscritorGroq(HttpClient http, string apiKey, string model
     /// <summary>Espera entre tentativas quando o servidor não diz quanto esperar. Ajustável nos testes.</summary>
     internal Func<int, TimeSpan> EsperaEntreTentativas { get; init; } = tentativa => TimeSpan.FromSeconds(3 * tentativa);
 
-    public async Task<Transcricao> TranscreverAsync(string caminhoAudio, CancellationToken cancelamento = default)
+    /// <param name="caminhoRespostaBruta">
+    /// Se informado, grava a resposta do Groq como chegou, antes de interpretar (mesmo que seja inválida).
+    /// Serve para diagnosticar erros de transcrição: mostra se o texto já veio errado da API.
+    /// </param>
+    public async Task<Transcricao> TranscreverAsync(
+        string caminhoAudio, string? caminhoRespostaBruta = null, CancellationToken cancelamento = default)
     {
         var chamador = new ChamadorComTentativas(http, "Groq") { EsperaEntreTentativas = EsperaEntreTentativas };
         var corpo = await chamador.EnviarAsync(() => MontarRequisicao(caminhoAudio), Erro, cancelamento);
+        if (caminhoRespostaBruta is not null)
+            await File.WriteAllTextAsync(caminhoRespostaBruta, corpo, new System.Text.UTF8Encoding(false), cancelamento);
         return Interpretar(corpo, modelo, idioma) with { Glossario = prompt };
     }
 
