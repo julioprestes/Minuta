@@ -41,9 +41,7 @@ public sealed class ExtratorAudio(FerramentasFfmpeg ferramentas)
     {
         var info = await InspecionarAsync(video.FullName, cancelamento);
         if (!info.TemAudio)
-            throw new MinutaException(
-                $"O arquivo não tem trilha de áudio: {video.Name}",
-                "Vídeos sem áudio (só a tela) serão tratados na Fase 2.");
+            throw new MinutaException($"O arquivo não tem trilha de áudio: {video.Name}");
 
         Directory.CreateDirectory(pastaSaida);
         var destino = Path.Combine(pastaSaida, Path.GetFileNameWithoutExtension(video.Name) + SufixoArquivo);

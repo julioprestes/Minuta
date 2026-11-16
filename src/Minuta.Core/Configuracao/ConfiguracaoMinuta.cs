@@ -14,6 +14,7 @@ public sealed record ConfiguracaoMinuta
     public const string VarIdioma = "MINUTA_IDIOMA";
     public const string VarFfmpegPath = "FFMPEG_PATH";
     public const string VarGlossario = "MINUTA_GLOSSARIO";
+    public const string VarPastaTrabalho = "MINUTA_PASTA_TRABALHO";
 
     public const string ModeloTranscricaoPadrao = "whisper-large-v3";
     public const string IdiomaPadrao = "pt";
@@ -41,6 +42,12 @@ public sealed record ConfiguracaoMinuta
     /// do glossario.txt ao lado do .env, se existir. Null = sem glossário.
     /// </summary>
     public string? CaminhoGlossario { get; init; }
+
+    /// <summary>
+    /// Onde criar a pasta de trabalho de cada vídeo (transcrição, telas, caches). Vem de MINUTA_PASTA_TRABALHO
+    /// (relativo à pasta do .env). Null = ao lado do documento.
+    /// </summary>
+    public string? PastaTrabalho { get; init; }
 
     /// <summary>Caminho do .env usado, ou null se nenhum foi encontrado.</summary>
     public string? ArquivoEnvUsado { get; init; }
@@ -79,6 +86,7 @@ public sealed record ConfiguracaoMinuta
             Idioma = Ler(VarIdioma) ?? IdiomaPadrao,
             FfmpegPath = Ler(VarFfmpegPath),
             CaminhoGlossario = caminhoGlossario,
+            PastaTrabalho = Ler(VarPastaTrabalho) is { } p ? Path.GetFullPath(Environment.ExpandEnvironmentVariables(p.Trim('"')), pastaBase) : null,
             ArquivoEnvUsado = caminhoEnv,
         };
     }

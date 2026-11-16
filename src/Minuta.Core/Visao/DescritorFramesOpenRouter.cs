@@ -15,7 +15,7 @@ namespace Minuta.Core.Visao;
 public sealed class DescritorFramesOpenRouter(HttpClient http, string apiKey, string modelo)
 {
     /// <summary>Aumente ao mudar o prompt ou o schema: invalida as descrições salvas.</summary>
-    public const int VersaoPrompt = 1;
+    public const int VersaoPrompt = 3;
 
     /// <summary>
     /// Frames por requisição. Cada frame de ~1152×720 custa ~900 tokens de entrada; 10 por lote mantém a resposta
@@ -35,8 +35,10 @@ public sealed class DescritorFramesOpenRouter(HttpClient http, string apiKey, st
         Regras obrigatórias:
         1. Copie os textos EXATAMENTE como aparecem na tela (títulos, menus, campos, botões, mensagens): sem traduzir,
            corrigir, acentuar ou completar. Se um texto não estiver legível, não invente: escreva [ilegível].
-        2. caminho_menu: se houver um menu aberto, o caminho visível do menu principal até o item destacado, separado
-           por " > " (ex.: "Vendas > Pedidos > Consulta de pedidos"). Vazio se não houver menu aberto.
+        2. caminho_menu: só quando um menu suspenso ou submenu estiver ABERTO: o caminho do menu principal até o item
+           destacado, separado por " > " (ex.: "Vendas > Pedidos > Consulta de pedidos"), um nível por item.
+           A barra de menus, as abas e as listas de opções apenas visíveis NÃO são caminho: não as liste uma após a
+           outra. Vazio se não houver menu aberto.
         3. campos_e_valores: "Rótulo: valor" dos campos preenchidos ou relevantes. Não liste campos vazios.
         4. mensagens: avisos, erros, confirmações e textos de status exibidos (janela de mensagem, barra de status).
         5. botoes: só botões, abas ou opções em destaque ou relevantes para a ação; não a barra de menus inteira.
@@ -156,9 +158,10 @@ public sealed class DescritorFramesOpenRouter(HttpClient http, string apiKey, st
         if (porNumero.Count < lote.Count && !aceitarIncompleto)
             throw new RespostaForaDoFormato($"vieram {porNumero.Count} de {lote.Count} frames");
 
-        static string Limpo(string? s) => s?.Trim() ?? "";
+        // Documentos e contatos copiados da tela não passam daqui (nem para o cache).
+        static string Limpo(string? s) => DadosPessoais.Mascarar(s?.Trim() ?? "");
         static IReadOnlyList<string> Lista(List<string>? l) =>
-            (l ?? []).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+            (l ?? []).Select(x => DadosPessoais.Mascarar(x.Trim())).Where(x => x.Length > 0).ToList();
 
         return lote.Select((frame, i) => porNumero.TryGetValue(i + 1, out var t)
                 ? new DescricaoTela(frame.Arquivo, frame.Tempo, Limpo(t.TituloJanela), Limpo(t.CaminhoMenu),

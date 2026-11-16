@@ -154,7 +154,7 @@ public class RedatorOpenRouterTests
         Assert.Equal("json_schema", (string?)corpo["response_format"]!["type"]);
         Assert.True((bool)corpo["response_format"]!["json_schema"]!["strict"]!);
         Assert.True((bool)corpo["provider"]!["require_parameters"]!);
-        Assert.Contains("[00:12] Quando eu clico em Salvar", (string?)corpo["messages"]![1]!["content"]);
+        Assert.Contains("[00:12] fala: Quando eu clico em Salvar", (string?)corpo["messages"]![1]!["content"]);
     }
 
     [Fact]

@@ -179,6 +179,100 @@ Registro do porquê das escolhas, para retomar o trabalho em qualquer máquina. 
 - **Continuidade:** cada lote leva o resumo da última tela do lote anterior, para a descrição dizer o que mudou.
 - **`--sem-visao`:** pula a trilha visual inteira, para vídeos cuja tela tenha dados sensíveis ou quando a cota estiver curta. A tela costuma mostrar mais dados reais que a fala.
 
+## 2026-11-16 — Linha do tempo e prompt v2 (Fase 2, etapa 3)
+
+- **Uma entrada só para o redator:** falas e telas intercaladas por tempo (`[mm:ss] fala: …` / `[mm:ss] tela: …`). Na mesma marca de tempo, a tela vem antes, porque a fala costuma comentar o que já está na tela.
+- **Citações das telas também são conferidas:** o trecho tem de existir na linha da tela, como já acontece com a fala. Se o trecho está na fala e na tela, conta como fala. Se aparece em várias telas, vale a mais próxima do tempo informado pelo modelo.
+- **Prompt v2:**
+  - nomes exatos da tela nos passos e nos cards (são a chave de busca no sistema);
+  - fala e tela divergentes viram dúvida;
+  - sugestão ("poderia ter", "o cliente gostaria") não é decisão;
+  - comentário não é passo;
+  - aspas simples nos textos.
+- **"A tela mostra o que o sistema fez, não o que deveria fazer."** No primeiro teste com o vídeo mudo, o modelo transformou a mensagem de erro em regra ("o sistema deve exibir 'Estoque insuficiente'"). Agora, sem fala nem contexto, ele descreve os passos e pergunta qual é o problema e o esperado.
+- **Aspas duplas quebravam itens:** o modelo citava nomes da tela entre aspas duplas dentro do texto, e a saída virava fragmentos ("Abrir a janela", "com botões OK e Salvar"). Resolvido pedindo aspas simples.
+- **`--contexto`:** texto de quem enviou o vídeo (ex.: o chamado). Orienta a análise, mas não é citável, e o que o vídeo não confirmar vira dúvida. Aparece no cabeçalho do documento, separado do que veio do vídeo.
+- **Cache por assinatura:** a análise salva só vale se a entrada for a mesma (hash da mensagem: falas, telas e contexto). Substitui a regra "transcrição nova invalida a análise", que não cobria telas nem contexto.
+- **Vídeo sem fala:** a transcrição fica vazia e a análise usa só as telas. Só dá erro se também não houver telas.
+- **Testes reais** (vídeo fictício de 20 s com telas sintéticas e narração TTS):
+  - com fala e contexto: 14 de 14 citações, 10 da tela. A divergência entre a fala ("abro um novo pedido") e a tela (menu destacando "Consulta de pedidos") virou dúvida.
+  - mudo: 7 de 7, todas da tela, sem regra nem card inventados.
+
+## 2026-11-16 — A fala manda; as telas num arquivo à parte (ajuste da Fase 2)
+
+O primeiro teste num vídeo real de análise (3,5 min, 35 frames) mostrou dois problemas:
+- **Um requisito dito sumiu.** A fala citava um menu e a tela mostrava uma janela com outro nome. Em vez de registrar a divergência como dúvida, o modelo descartou o pedido. Hipóteses: a regra "divergência vira dúvida" foi lida como "na dúvida, tire", e as 35 linhas de tela diluíram a fala.
+- **O documento ficou poluído:** a seção "Telas do vídeo" listava as 35 telas, várias repetidas, e o modelo de visão punha a barra de menus inteira no "caminho do menu".
+
+Mudanças:
+- **Prompt da análise v3:** a fala é a fonte principal. Todo pedido dito vira regra, card ou passo, e a divergência com a tela nunca elimina o item: ele fica como foi dito, e a divergência vira dúvida. O modelo confere, antes de responder, se cada pedido dito está em alguma regra ou card.
+- **Telas repetidas juntadas** (`DescricaoVisual.TelasDistintas`):
+  - Iguais são as que têm os mesmos textos copiados da tela (janela, menu, campos, mensagens e botões). A descrição, escrita com palavras do modelo, não conta. Sem nenhum texto copiado, só junta se a descrição for igual.
+  - A linha do tempo manda `[mm:ss] tela (até mm:ss): …` uma vez só. A conferência das citações usa a mesma lista.
+- **Lista das telas em `<video>.telas.md`:** saiu do documento principal, que volta ao formato da primeira versão. O principal só conta as telas no cabeçalho, mantém o *(tela)* e o link "ver tela" nos cards e aponta o arquivo no rodapé. O `.telas.md` traz as telas distintas, com o intervalo, os campos, a descrição e o link da imagem, para anexar a um chat que conheça o sistema.
+- **Prompt da visão v2:** `caminho_menu` só quando um menu suspenso estiver aberto, do menu principal até o item destacado. A barra de menus, as abas e as listas apenas visíveis não contam. Pede também o título completo da janela.
+- **Console:** mostra só a contagem das telas e o caminho do `.telas.md` (antes listava todas).
+- **Papel do Minuta, discutido com o desenvolvedor:** ele registra fielmente o que foi dito e mostrado, para quem não viu o vídeo e para quem gravou não ter de transcrever. A análise final, com o contexto do sistema, pode ser feita depois, por uma pessoa ou por um chat que conheça o sistema. Até onde a documentação oficial mostra (consultada em 2026-11-16), o chat do Claude aceita documentos e imagens, mas não vídeo.
+- **Testes reais (vídeo fictício):**
+  - com fala e contexto: 9 de 9 citações. O passo ficou como foi dito ("abrir 'Novo pedido'"), e a divergência com o menu destacado ("Consulta de pedidos") virou dúvida.
+  - mudo: 6 de 6, todas da tela, só passos e dúvidas, sem regra nem card.
+  - **Vídeo real, resultado parcial:**
+    - Melhorou: o caminho do menu veio certo, as telas caíram de 35 para 27, as citações bateram (35 de 35) e o requisito que tinha sumido reapareceu, mas só como dúvida.
+    - Piorou: um card nasceu de uma frase de contexto, como se fosse pedido ("quando o cliente for cadastrar…" virou "implementar o cadastro", que já existe); vieram 16 passos para reproduzir num vídeo de requisito; e alguns títulos de janela pioraram, trocados por rótulos de campo.
+    - Os campos das telas trazem dados pessoais (nome, CPF, endereço) para o `.telas.md`.
+    - Hipótese: a tela ainda pesa demais na entrada do redator, sobretudo a lista de campos. Fica para o próximo ajuste.
+
+## 2026-11-16 — Tela enxuta, pedido × contexto e dados pessoais (segundo ajuste da Fase 2)
+
+- **Tela enxuta quando há fala:**
+  - Na linha do tempo do redator, a tela entra só com janela, menu aberto e mensagens: os nomes que servem para localizar no sistema. Campos, descrição e ação provável ficam de fora.
+  - Telas que ficam iguais depois de enxugadas (só os campos mudavam) viram uma, e tela sem nenhum desses nomes não entra.
+  - Sem fala, a tela vai completa, porque é a única fonte.
+  - O `.telas.md` continua com os campos e a descrição.
+- **Prompt da análise v4:**
+  - "Pedido" é o que se quer mudar ou acrescentar ("o cliente deseja", "que conste"). Frase que só situa o fluxo ("quando o cliente for cadastrar…") é contexto, e o que a tela já mostra funcionando não vira regra nem card.
+  - Passos para reproduzir só quando há erro ou o vídeo não tem fala. Em vídeo de requisito, o caminho até a tela entra no card.
+  - Algo a confirmar com o cliente é dúvida, não card.
+  - A transcrição quebra as frases em linhas: o modelo deve ler as falas seguidas antes de dizer que algo ficou cortado.
+- **Prompt da visão v3:** saiu a frase "título completo da janela", que fez o modelo trocar o título da janela por rótulos de campo. Ficou a regra do menu aberto.
+- **Dados pessoais (`DadosPessoais.Mascarar`):** CPF, CNPJ, telefone e e-mail copiados da tela viram `[oculto]` logo na leitura da resposta do modelo de visão, antes do cache. Assim, não chegam à análise, ao `.visao.json` nem ao `.telas.md`.
+  - Ficam números que não são documento: safra "2025-2026", CEP, valores, datas e chaves de 44 dígitos.
+  - Nomes e endereços não têm formato fixo e continuam. As imagens dos frames também guardam tudo, e o modelo de visão já viu a tela inteira.
+- **Testes reais (vídeo fictício):**
+  - Com fala: 9 de 9 e depois 17 de 17. Numa rodada, a divergência entre fala e menu virou dúvida; na outra, não. É variação do modelo gratuito com o mesmo prompt.
+  - Mudo: 5 de 6, com 1 citação não conferida marcada com ⚠; só passos e dúvidas.
+  - O vídeo real fica para o desenvolvedor rodar.
+- **Vídeo real, depois do segundo ajuste:**
+  - O pedido que tinha sumido voltou como card, e sumiram os passos de um vídeo sem erro e os cards errados.
+  - O CPF e o telefone saíram ocultos.
+  - Ficou um card para três pedidos; os outros dois ficaram como regra.
+
+## 2026-11-16 — Perfil Resumo e pasta de trabalho
+
+- **O problema:** o documento de análise virou uma lista de regras e cards que repete a fala. Para entender o caso sem ver o vídeo, funcionava melhor o formato da primeira versão: um resumo que explica, as dúvidas e os passos.
+- **Perfil, não segundo arquivo:**
+  - Primeiro pensamos em gerar dois documentos por vídeo. Ficou um perfil novo, `resumo`, ao lado de `analise` e `ata`.
+  - A extração continua sendo uma só; cada perfil é só uma forma de montar o documento, e trocar não chama API.
+  - Cada perfil grava o próprio arquivo (`video.<perfil>.md`), então gerar dois não sobrescreve nada.
+- **O perfil Resumo traz:**
+  - "O que o vídeo mostra" (o resumo da análise);
+  - "O que se pede": os títulos dos cards, que já são o pedido em uma frase, ou as regras quando não há card;
+  - passos para reproduzir (só se for erro);
+  - dúvidas.
+  - Não traz critérios de aceite nem regras.
+- **Prompt da análise v5:**
+  - O resumo vira uma explicação de 3 a 6 frases para quem não viu o vídeo: o que foi mostrado e em que tela, o problema ou o pedido, e o que ficou em aberto. Antes eram 2 a 5 frases sobre "do que o vídeo trata".
+  - As dúvidas ficam só com o que muda o que deve ser feito. Nada de perguntas sobre pessoas, nomes, saudações ou frases soltas: num vídeo curto, o modelo tinha perguntado quem era uma pessoa citada de passagem.
+- **Pasta de trabalho `<video>.minuta/`:**
+  - Ao lado do vídeo ficam só os documentos; transcrição, telas, frames, áudio e caches vão para a pasta de trabalho.
+  - O padrão é uma pasta ao lado, não o temp, porque o temp pode ser limpo (aí a transcrição e as telas seriam refeitas) e porque assim os links do documento continuam valendo se a pasta for movida junto. `--trabalho` ou `MINUTA_PASTA_TRABALHO` mudam o lugar.
+  - Os links do documento são relativos a ele.
+  - Na primeira execução, os arquivos de trabalho deixados ao lado do vídeo por versões anteriores são movidos para a pasta nova, sem sobrescrever nada. O antigo `video.minuta.md` fica onde está, porque é documento do usuário.
+- **Testes reais (vídeos fictícios):**
+  - Com fala, no perfil `resumo`: o resumo explica o fluxo, o problema e o que ficou em aberto, com 12 de 12 citações. O perfil `analise` saiu do cache, sem chamar API.
+  - Mudo: o resumo descreve as telas e diz que, sem fala, o problema não foi informado.
+  - A migração moveu os arquivos antigos dos dois vídeos.
+
 ## Limites dos planos gratuitos (consultados em 2026-11-12)
 
 | Provedor | Limite |

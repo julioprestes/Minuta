@@ -29,7 +29,8 @@ public class GeradorDocumentoTests
     { Modelo = "modelo/teste:free" };
 
     private static string Gerar(PerfilDocumento perfil) =>
-        GeradorDocumento.Gerar(Analise(), Exemplos.Transcricao(), perfil, "pedidos.mp4", Agora, "pedidos.transcricao.txt");
+        GeradorDocumento.Gerar(Analise(), Exemplos.Transcricao(), perfil, "pedidos.mp4", Agora,
+            new ExtrasDocumento { ArquivoTranscricao = "pedidos.transcricao.txt" });
 
     [Fact]
     public void Analise_tem_cabecalho_secoes_na_ordem_e_tempos()
@@ -40,7 +41,7 @@ public class GeradorDocumentoTests
         Assert.Contains("- **Vídeo:** pedidos.mp4 (01:10)", md);
         Assert.Contains("- **Gerado em:** 13/11/2026 16:05, pelo Minuta", md);
         Assert.Contains("análise modelo/teste:free", md);
-        Assert.Contains("- **Citações conferidas na transcrição:** 5 de 6", md);
+        Assert.Contains("- **Citações conferidas no vídeo:** 5 de 6", md);
 
         var ordem = new[] { "## Resumo", "## Passos para reproduzir", "## Decisões", "## Dúvidas em aberto", "## Cards de tarefa", "## Próximos passos" }
             .Select(t => md.IndexOf(t, StringComparison.Ordinal)).ToList();

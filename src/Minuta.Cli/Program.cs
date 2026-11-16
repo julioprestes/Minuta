@@ -61,11 +61,16 @@ static async Task<int> ExecutarAsync(string[] args, CancellationToken cancelamen
         RefazerFrames: args.Contains("--refazer-frames"),
         Redescrever: args.Contains("--redescrever"),
         SemVisao: args.Contains("--sem-visao"),
+        Contexto: LerOpcao(args, "--contexto"),
         Perfil: PerfisDocumento.Obter(LerOpcao(args, "--perfil") ?? PerfisDocumento.Analise.Id));
     var config = ConfiguracaoMinuta.Carregar();
+    opcoes = opcoes with
+    {
+        BasePastaTrabalho = LerOpcao(args, "--trabalho") is { } trabalho ? Path.GetFullPath(trabalho) : config.PastaTrabalho,
+    };
 
     Console.WriteLine($"Vídeo: {video.FullName} ({Megabytes(video.Length)})");
-    Console.WriteLine($"Saída: {pastaSaida}");
+    Console.WriteLine($"Documento em: {pastaSaida}");
     Console.WriteLine();
 
     using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
@@ -86,18 +91,22 @@ static async Task<int> ExecutarAsync(string[] args, CancellationToken cancelamen
         Console.WriteLine($"Telas: {f.Frames.Count} frame(s) em {f.Pasta}");
         if (resultado.Visao is { } v)
         {
-            Console.WriteLine($"  Descritas por {v.Modelo}: {resultado.CaminhoVisao}");
-            Console.WriteLine("  (ainda não entram na análise; Fase 2, próxima etapa)");
-            foreach (var tela in v.Telas)
-                Console.WriteLine($"  [{Transcricao.FormatarTempo(tela.Tempo)}] {tela.Resumo()}");
+            var vazias = v.Telas.Count(tela => tela.Vazia);
+            Console.WriteLine($"  Descritas por {v.Modelo}: {v.TelasDistintas().Count} tela(s) distinta(s)"
+                + (vazias > 0 ? $", {vazias} frame(s) sem descrição" : "") + ".");
+            Console.WriteLine($"  {resultado.CaminhoTelas}");
         }
     }
 
     MostrarAnalise(resultado.Analise, resultado.CaminhoAnalise);
 
     Console.WriteLine();
+    Console.WriteLine($"Arquivos de trabalho (transcrição, telas, caches): {resultado.PastaTrabalho}");
+    Console.WriteLine();
     Console.WriteLine($"Documento ({opcoes.Perfil!.Titulo}):");
     Console.WriteLine($"  {resultado.CaminhoDocumento}");
+    var outros = PerfisDocumento.Todos.Where(p => p != opcoes.Perfil).Select(p => p.Id);
+    Console.WriteLine($"  Outros formatos, sem gastar API: --perfil {string.Join(" | ", outros)}");
     return 0;
 }
 
@@ -112,7 +121,8 @@ static void MostrarAnalise(AnaliseVideo a, string caminho)
 
     var citacoes = a.TodasAsCitacoes.ToList();
     var naoConferidas = citacoes.Where(c => !c.Conferida).ToList();
-    Console.WriteLine($"  Citações conferidas na transcrição: {citacoes.Count - naoConferidas.Count} de {citacoes.Count}.");
+    Console.WriteLine($"  Citações conferidas no vídeo: {citacoes.Count - naoConferidas.Count} de {citacoes.Count}"
+        + $" ({citacoes.Count(c => c.DaTela)} da tela).");
     foreach (var c in naoConferidas)
         Console.WriteLine($"  ⚠ não encontrada: \"{c.Trecho}\"");
 }
@@ -130,6 +140,7 @@ static int Checar()
     Console.WriteLine($"  {ConfiguracaoMinuta.VarModeloVisao,-26}{config.ModeloVisao ?? (config.ModeloAnalise is null ? "(não definido)" : "(o mesmo da análise)")}");
     Console.WriteLine($"  {ConfiguracaoMinuta.VarIdioma,-26}{config.Idioma}");
     Console.WriteLine($"  {"Glossário",-26}{DescreverGlossario(config.CaminhoGlossario)}");
+    Console.WriteLine($"  {ConfiguracaoMinuta.VarPastaTrabalho,-26}{config.PastaTrabalho ?? "(ao lado do documento)"}");
 
     var ok = true;
     try
@@ -191,7 +202,7 @@ static string? LerOpcao(string[] args, string nome)
 static void MostrarAjuda()
 {
     Console.WriteLine("""
-        Minuta — transforma vídeos de reunião em documento .md para o desenvolvimento.
+        Minuta — transforma vídeos de sistema (análise, relato de erro) em documento .md para o desenvolvimento.
 
         Uso:
           minuta <video> [opções]   processa o vídeo
@@ -199,8 +210,14 @@ static void MostrarAjuda()
           minuta --ajuda            mostra esta ajuda
 
         Opções:
-          --perfil <nome>     formato do documento: analise (padrão) ou ata
-          --saida <pasta>     onde gravar os arquivos (padrão: pasta do vídeo)
+          --perfil <nome>     formato do documento (video.<perfil>.md); trocar não gasta API:
+                                analise  regras, cards e critérios, para o desenvolvimento (padrão)
+                                resumo   o que o vídeo mostra, o que se pede e as dúvidas, para ler sem assistir
+                                ata      resumo, decisões e próximos passos de reunião
+          --contexto "<texto>" o que quem enviou o vídeo disse (ex.: o chamado); orienta, mas não é citado
+          --saida <pasta>     onde gravar o documento (padrão: pasta do vídeo)
+          --trabalho <pasta>  onde criar a pasta de trabalho <video>.minuta, com transcrição, telas e caches
+                              (padrão: ao lado do documento; ou MINUTA_PASTA_TRABALHO no .env)
           --retranscrever     ignora a transcrição já salva e transcreve de novo
           --reanalisar        ignora a análise já salva e chama o modelo de novo
           --refazer-frames    escolhe de novo os frames da tela

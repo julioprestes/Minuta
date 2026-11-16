@@ -41,7 +41,41 @@ public sealed record DescricaoTela(
 public sealed record DescricaoVisual(string Modelo, int VersaoPrompt, IReadOnlyList<DescricaoTela> Telas)
 {
     public OrigemTranscricao? Origem { get; init; }
+
+    /// <summary>
+    /// As telas descritas, com as iguais em sequência juntadas em uma só (a primeira, que vale até <see cref="GrupoTelas.Fim"/>).
+    /// Iguais = mesmos textos copiados da tela (janela, menu, campos, mensagens e botões); a descrição e a ação provável,
+    /// que o modelo escreve com palavras próprias, não contam. Frames vazios ficam de fora.
+    /// </summary>
+    public IReadOnlyList<GrupoTelas> TelasDistintas()
+    {
+        var grupos = new List<GrupoTelas>();
+        foreach (var tela in Telas.Where(t => !t.Vazia))
+        {
+            if (grupos.Count > 0 && MesmaTela(grupos[^1].Tela, tela))
+                grupos[^1] = grupos[^1] with { Fim = tela.Tempo, Frames = grupos[^1].Frames + 1 };
+            else
+                grupos.Add(new GrupoTelas(tela, tela.Tempo, 1));
+        }
+        return grupos;
+    }
+
+    private static bool MesmaTela(DescricaoTela a, DescricaoTela b)
+    {
+        var mesmosTextos = a.TituloJanela == b.TituloJanela
+            && a.CaminhoMenu == b.CaminhoMenu
+            && a.CamposEValores.SequenceEqual(b.CamposEValores)
+            && a.Mensagens.SequenceEqual(b.Mensagens)
+            && a.Botoes.SequenceEqual(b.Botoes);
+        // Sem nenhum texto copiado (só a descrição), não há como afirmar que é a mesma tela.
+        var semTextos = a.TituloJanela.Length == 0 && a.CaminhoMenu.Length == 0
+            && a.CamposEValores.Count == 0 && a.Mensagens.Count == 0;
+        return mesmosTextos && (!semTextos || a.Descricao == b.Descricao);
+    }
 }
+
+/// <summary>Uma tela que ficou igual em um ou mais frames seguidos, de <c>Tela.Tempo</c> até <see cref="Fim"/>.</summary>
+public sealed record GrupoTelas(DescricaoTela Tela, TimeSpan Fim, int Frames);
 
 /// <summary>Grava e lê <c>&lt;video&gt;.visao.json</c>, para não gastar cota descrevendo os mesmos frames de novo.</summary>
 public static class ArquivoVisao

@@ -492,3 +492,8 @@ glossario.txt
 *.groq.json
 *.frames/
 *.visao.json
+*.telas.md
+*.minuta/
+*.resumo.md
+*.analise.md
+*.ata.md

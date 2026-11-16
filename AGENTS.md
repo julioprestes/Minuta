@@ -46,7 +46,7 @@ Atualize esta seção ao fim de cada etapa. O porquê das escolhas está em [doc
 - ✅ Resposta bruta do Groq gravada em `<video>.groq.json` (diagnóstico). Em investigação: um trecho de vídeo real vem com letras cortadas a partir do acento (ver DECISOES).
 - ✅ Etapa 5, documento: `GeradorDocumento` monta `<video>.minuta.md` a partir da análise, com os perfis `analise` (padrão) e `ata` (`--perfil`). Seções vazias não aparecem; tempos `[mm:ss]` e ⚠ para citação não conferida. O console mostra só a contagem e o caminho.
 
-**Fase 2, em andamento (trilha visual):**
+**Fase 2, concluída (trilha visual):**
 - ✅ Etapa 1, frames: `DetectorMudancas` compara quadros pequenos em cinza lidos crus da saída do ffmpeg (sem biblioteca de imagem). Escolhe a tela quando ela muda e assenta, ignora o cursor, pega um frame por intervalo longo se algo mudou e o último quadro.
   - `ExtratorFrames` salva os JPEG (até 1280 px) em `<video>.frames/`, com `indice.json`, e reaproveita (`--refazer-frames` refaz; mudar `VersaoSelecao` invalida).
   - Testada em vídeo real de 3,5 min: 35 frames em ~15 s, incluindo menus e submenus abertos.
@@ -56,13 +56,42 @@ Atualize esta seção ao fim de cada etapa. O porquê das escolhas está em [doc
   - Modelo em `OPENROUTER_MODELO_VISAO` (vazio = o da análise). Cache `<video>.visao.json` (`--redescrever` refaz). `--sem-visao` pula a trilha visual.
   - A parte comum do OpenRouter (requisição, erros, leitura da resposta, ajudantes do schema) foi para `Http/OpenRouterChat`.
   - Testada com vídeo sintético (telas fictícias + narração TTS): 4 telas, menu destacado e mensagem de erro lidos certo.
-- ⏭️ Etapa 3, linha do tempo: falas e telas juntas por `[mm:ss]`; prompt `VersaoPrompt` 2 (com os ajustes: observação não vira passo, sugestão separada de decisão); `--contexto`; vídeo sem fala deixa de dar erro; frames principais citados no `.md`.
+- ✅ Etapa 3, linha do tempo: `LinhaDoTempo` junta falas (`fala:`) e telas (`tela:`) por `[mm:ss]`; é o que o redator recebe e o que a conferência usa.
+  - `ConferenciaCitacoes` confere nas falas (podem atravessar trechos) e nas telas (a mais próxima do tempo informado). A fala tem prioridade. `Citacao` ganhou `DaTela` e `Frame`.
+  - Prompt `VersaoPrompt` 2: nomes exatos da tela nos passos e cards; fala × tela divergentes viram dúvida; sugestão não é decisão; comentário não é passo; a tela mostra o que o sistema fez, não o que deveria (sem fala nem contexto, nada de regra ou card só pela tela); aspas simples nos textos.
+  - `--contexto "..."`: orienta a análise, não é citável, aparece no cabeçalho do `.md`.
+  - Cache da análise por **assinatura** da entrada (falas + telas + contexto), no lugar de "a transcrição foi reaproveitada".
+  - Vídeo sem áudio ou sem fala usa só as telas; só dá erro se também não houver telas (ou com `--sem-visao`).
+  - Documento: citações de tela marcadas *(tela)*, link para a imagem nos cards, seção "Telas do vídeo" (perfil `analise`), modelos e contexto no cabeçalho.
+  - Testada com vídeo fictício com fala + `--contexto` (14 de 14 citações, 10 da tela) e com a versão muda dele (7 de 7, todas da tela; sem regra inventada).
+- ✅ Ajuste depois do primeiro vídeo real (um requisito dito tinha sumido; documento poluído pelas telas):
+  - Prompt da análise `VersaoPrompt` 3: a fala é a fonte principal, e a divergência com a tela nunca elimina o item (ele fica como foi dito, e a divergência vira dúvida).
+  - `DescricaoVisual.TelasDistintas()` junta telas iguais em sequência (mesmos textos copiados da tela). A linha do tempo manda `tela (até mm:ss)` uma vez só.
+  - A lista das telas saiu do `.md` principal e foi para `<video>.telas.md` (`DocumentoTelas`), feito para anexar a um chat que conheça o sistema. O principal mantém *(tela)* e "ver tela" nos cards e cita o arquivo no rodapé. O perfil `analise` não tem mais a seção de telas.
+  - Prompt da visão `VersaoPrompt` 2: `caminho_menu` só com menu suspenso aberto (a barra de menus não conta) e título completo da janela.
+  - Testado no vídeo fictício (9 de 9; divergência virou dúvida e o passo ficou) e no mudo (6 de 6).
+  - No vídeo real o resultado foi parcial: o menu e as citações melhoraram, mas o requisito voltou só como dúvida, e as telas ainda pesam demais (ver DECISOES).
+- ✅ Segundo ajuste:
+  - Com fala, a tela entra na linha do tempo enxuta: janela, menu e mensagens (`LinhaDoTempo.TextoEnxutoDaTela`). Sem fala, vai completa.
+  - Prompt da análise `VersaoPrompt` 4: pedido × frase de contexto; passos só com erro ou sem fala; confirmação com o cliente é dúvida; frases continuam na fala seguinte.
+  - Prompt da visão `VersaoPrompt` 3 (sai "título completo").
+  - `DadosPessoais.Mascarar` troca CPF, CNPJ, telefone e e-mail das telas por `[oculto]` antes do cache.
+  - Fictícios ok (com variação do modelo gratuito). No vídeo real, o pedido voltou como card e os dados pessoais saíram ocultos.
+- ✅ Perfil Resumo e pasta de trabalho:
+  - Perfil `resumo`: o que o vídeo mostra, o que se pede (`TipoSecao.Pedidos`: títulos dos cards, ou regras), passos (se for erro) e dúvidas.
+  - Cada perfil grava `<video>.<perfil>.md` (`PerfilDocumento.NomeArquivo`); trocar de perfil não chama API.
+  - Prompt da análise `VersaoPrompt` 5: resumo explicativo de 3 a 6 frases; dúvidas só com o que muda o que deve ser feito.
+  - `PastaTrabalho`: transcrição, telas, frames, áudio e caches vão para `<video>.minuta/`, ao lado do documento, ou dentro de `--trabalho` / `MINUTA_PASTA_TRABALHO`.
+    - Os links do documento são relativos.
+    - Os arquivos antigos que estavam ao lado do vídeo são movidos na primeira execução.
+  - Testado nos vídeos fictícios (resumo, analise sem API, mudo e migração). Falta o vídeo real no perfil `resumo`.
 
 **Próximos passos, em ordem de prioridade** (cada um precisa de liberação):
-1. Terminar a Fase 2 (etapa 3 acima).
-2. Perfis personalizados lidos de pasta local fora do git.
-3. Importar transcrição pronta (Claude Meetings, `.vtt`/`.srt`) para reuniões.
-4. Fase 3 (áudio longo), se aparecer necessidade.
+1. Perfis personalizados lidos de pasta local fora do git.
+2. Importar transcrição pronta (Claude Meetings, `.vtt`/`.srt`) para reuniões.
+3. Fase 3 (áudio longo), se aparecer necessidade.
+4. Fase 4 (interface WPF).
+- Ideias anotadas: filtro de frases alucinadas do Whisper ("acompanhe o vídeo…"); re-transcrever sozinhos os trechos com letras cortadas.
 
 **Para rodar numa máquina nova:**
 1. Instalar o .NET 10 SDK e o FFmpeg (`winget install Gyan.FFmpeg`, depois abrir um terminal novo).

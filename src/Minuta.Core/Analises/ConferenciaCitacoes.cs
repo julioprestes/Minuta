@@ -5,30 +5,40 @@ using Minuta.Core.Transcricoes;
 namespace Minuta.Core.Analises;
 
 /// <summary>
-/// Confere se o trecho citado pelo modelo existe de verdade na transcrição.
-/// A comparação ignora acentos, maiúsculas, pontuação e espaços, e aceita trechos que atravessam
-/// dois segmentos. Quando acha, o tempo da citação passa a ser o do segmento real (o modelo pode errar o tempo).
+/// Confere se o trecho citado pelo modelo existe de verdade na linha do tempo: nas falas (que podem ser citadas
+/// atravessando dois trechos seguidos) ou na descrição de uma tela. A comparação ignora acentos, maiúsculas,
+/// pontuação e espaços. Quando acha, o tempo da citação passa a ser o real (o modelo pode errar o tempo).
 /// </summary>
 public sealed class ConferenciaCitacoes
 {
     /// <summary>Trechos muito curtos ("sim", "ok") aparecem em qualquer lugar e não provam nada.</summary>
     public const int MinimoDeCaracteres = 8;
 
-    private readonly string texto;
-    private readonly List<(int Posicao, SegmentoTranscricao Segmento)> inicios = [];
+    private readonly string falas;
+    private readonly List<(int Posicao, EntradaLinhaDoTempo Entrada)> inicios = [];
+    private readonly List<(string Normalizado, EntradaLinhaDoTempo Entrada)> telas = [];
 
-    public ConferenciaCitacoes(Transcricao transcricao)
+    public ConferenciaCitacoes(Transcricao transcricao) : this(LinhaDoTempo.Montar(transcricao))
+    {
+    }
+
+    public ConferenciaCitacoes(IEnumerable<EntradaLinhaDoTempo> linhaDoTempo)
     {
         var sb = new StringBuilder();
-        foreach (var segmento in transcricao.Segmentos)
+        foreach (var entrada in linhaDoTempo)
         {
-            var normalizado = Normalizar(segmento.Texto);
+            var normalizado = Normalizar(entrada.Texto);
             if (normalizado.Length == 0)
                 continue;
-            inicios.Add((sb.Length, segmento));
+            if (entrada.DaTela)
+            {
+                telas.Add((normalizado, entrada));
+                continue;
+            }
+            inicios.Add((sb.Length, entrada));
             sb.Append(normalizado).Append(' ');
         }
-        texto = sb.ToString();
+        falas = sb.ToString();
     }
 
     public Citacao Conferir(string trecho, string? tempoInformado)
@@ -38,22 +48,31 @@ public sealed class ConferenciaCitacoes
 
         if (normalizado.Length >= MinimoDeCaracteres)
         {
-            var posicao = texto.IndexOf(normalizado, StringComparison.Ordinal);
+            var posicao = falas.IndexOf(normalizado, StringComparison.Ordinal);
             if (posicao >= 0)
-                return new Citacao(limpo, SegmentoEm(posicao).Inicio, Conferida: true);
+                return new Citacao(limpo, FalaEm(posicao).Inicio, Conferida: true);
+
+            // Na tela, prefere a mais próxima do tempo informado (a mesma mensagem pode aparecer em várias telas).
+            var informado = LerTempo(tempoInformado);
+            var tela = telas.Where(t => t.Normalizado.Contains(normalizado, StringComparison.Ordinal))
+                .Select(t => t.Entrada)
+                .OrderBy(e => informado is null ? TimeSpan.Zero : (e.Inicio - informado.Value).Duration())
+                .FirstOrDefault();
+            if (tela is not null)
+                return new Citacao(limpo, tela.Inicio, Conferida: true, DaTela: true, Frame: tela.Frame);
         }
 
         return new Citacao(limpo, LerTempo(tempoInformado), Conferida: false);
     }
 
-    private SegmentoTranscricao SegmentoEm(int posicao)
+    private EntradaLinhaDoTempo FalaEm(int posicao)
     {
-        var atual = inicios[0].Segmento;
-        foreach (var (inicio, segmento) in inicios)
+        var atual = inicios[0].Entrada;
+        foreach (var (inicio, entrada) in inicios)
         {
             if (inicio > posicao)
                 break;
-            atual = segmento;
+            atual = entrada;
         }
         return atual;
     }

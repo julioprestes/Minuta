@@ -4,10 +4,12 @@ using Minuta.Core.Transcricoes;
 
 namespace Minuta.Core.Analises;
 
-/// <summary>Trecho da transcrição que justifica um item.</summary>
-/// <param name="Inicio">Momento no vídeo. Se conferida, vem da própria transcrição; senão, é o que o modelo informou.</param>
-/// <param name="Conferida">O trecho foi encontrado na transcrição.</param>
-public sealed record Citacao(string Trecho, TimeSpan? Inicio, bool Conferida);
+/// <summary>Trecho da linha do tempo (fala ou tela) que justifica um item.</summary>
+/// <param name="Inicio">Momento no vídeo. Se conferida, vem da própria linha do tempo; senão, é o que o modelo informou.</param>
+/// <param name="Conferida">O trecho foi encontrado na linha do tempo.</param>
+/// <param name="DaTela">O trecho veio da descrição de uma tela, não da fala.</param>
+/// <param name="Frame">Arquivo do frame (na pasta de frames) quando a citação é de uma tela.</param>
+public sealed record Citacao(string Trecho, TimeSpan? Inicio, bool Conferida, bool DaTela = false, string? Frame = null);
 
 public sealed record ItemCitado(string Texto, IReadOnlyList<Citacao> Citacoes);
 
@@ -34,6 +36,9 @@ public sealed record AnaliseVideo(
     public int VersaoPrompt { get; init; }
     public OrigemTranscricao? Origem { get; init; }
 
+    /// <summary>Assinatura da entrada enviada ao modelo (falas, telas e contexto); ver <see cref="RedatorOpenRouter.AssinaturaDaEntrada"/>.</summary>
+    public string? Assinatura { get; init; }
+
     public IEnumerable<Citacao> TodasAsCitacoes =>
         new[] { Decisoes, RegrasNegocio, DuvidasEmAberto, PassosParaReproduzir, ProximosPassos }
             .SelectMany(lista => lista).SelectMany(i => i.Citacoes)
@@ -55,9 +60,10 @@ public static class ArquivoAnalise
         File.WriteAllText(caminho, JsonSerializer.Serialize(analise, Opcoes), Encoding.UTF8);
 
     /// <summary>
-    /// Lê a análise salva se for do mesmo vídeo, do mesmo modelo e da mesma versão do prompt; senão, null.
+    /// Lê a análise salva se for do mesmo vídeo, do mesmo modelo, da mesma versão do prompt e, quando informada,
+    /// da mesma entrada (assinatura); senão, null.
     /// </summary>
-    public static AnaliseVideo? Carregar(string caminho, FileInfo video, string modelo, int versaoPrompt)
+    public static AnaliseVideo? Carregar(string caminho, FileInfo video, string modelo, int versaoPrompt, string? assinatura = null)
     {
         if (!File.Exists(caminho))
             return null;
@@ -69,6 +75,7 @@ public static class ArquivoAnalise
                 && salva.Origem == OrigemTranscricao.De(video)
                 && salva.Modelo == modelo
                 && salva.VersaoPrompt == versaoPrompt
+                && (assinatura is null || salva.Assinatura == assinatura)
                 ? salva
                 : null;
         }
