@@ -54,6 +54,32 @@ public class PerfilResumoTests
     }
 
     [Fact]
+    public void Regra_coberta_por_card_nao_se_repete_e_regra_sem_card_entra()
+    {
+        // O modelo juntou dois pedidos num card só: o de 00:50 ficou só como regra.
+        var analise = Analise() with
+        {
+            RegrasNegocio =
+            [
+                new("O sistema deve mostrar o total com desconto.", [Ok(20, "o cliente deseja ver o total com desconto")]),
+                new("O sistema deve permitir escolher a transportadora no pedido.", [Ok(50, "também quer escolher a transportadora")]),
+            ],
+        };
+
+        var pedidos = GeradorDocumento.Pedidos(analise);
+
+        Assert.Equal(
+            ["Mostrar total com desconto no 'Novo pedido'", "O sistema deve permitir escolher a transportadora no pedido."],
+            pedidos.Select(p => p.Texto));
+    }
+
+    [Fact]
+    public void Prompt_pede_um_card_por_pedido()
+    {
+        Assert.Contains("UM CARD POR PEDIDO", RedatorOpenRouter.InstrucoesDoSistema);
+    }
+
+    [Fact]
     public void Cada_perfil_tem_o_proprio_arquivo()
     {
         Assert.Equal("video.resumo.md", PerfisDocumento.Resumo.NomeArquivo("video"));

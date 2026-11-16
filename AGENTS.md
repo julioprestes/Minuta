@@ -84,7 +84,12 @@ Atualize esta seção ao fim de cada etapa. O porquê das escolhas está em [doc
   - `PastaTrabalho`: transcrição, telas, frames, áudio e caches vão para `<video>.minuta/`, ao lado do documento, ou dentro de `--trabalho` / `MINUTA_PASTA_TRABALHO`.
     - Os links do documento são relativos.
     - Os arquivos antigos que estavam ao lado do vídeo são movidos na primeira execução.
-  - Testado nos vídeos fictícios (resumo, analise sem API, mudo e migração). Falta o vídeo real no perfil `resumo`.
+  - Testado nos vídeos fictícios (resumo, analise sem API, mudo e migração) e no vídeo real, aprovado pelo desenvolvedor.
+  - "O que se pede" saía só dos cards: quando o modelo juntou três pedidos num card, a lista ficou com um só.
+- ✅ Correção dos pedidos:
+  - Prompt da análise `VersaoPrompt` 6: um card por pedido, com o título sendo o pedido em uma frase, com a tela.
+  - `GeradorDocumento.Pedidos`: os títulos dos cards mais as regras que nenhum card cobre (as que não citam o mesmo momento do vídeo que algum card).
+  - Testado nos fictícios (com fala: 1 pedido, sem repetir a regra; mudo: nenhum pedido) e no vídeo real, aprovado pelo desenvolvedor.
 
 **Próximos passos, em ordem de prioridade** (cada um precisa de liberação):
 1. Perfis personalizados lidos de pasta local fora do git.

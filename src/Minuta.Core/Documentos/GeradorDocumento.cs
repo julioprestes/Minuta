@@ -107,11 +107,7 @@ public static class GeradorDocumento
                 return;
 
             case TipoSecao.Pedidos:
-                // Os cards já são os pedidos em uma frase; sem cards, as regras dizem o que se espera do sistema.
-                var pedidos = a.Cards.Count > 0
-                    ? a.Cards.Select(c => new ItemCitado(c.Titulo, c.Citacoes)).ToList()
-                    : a.RegrasNegocio;
-                EscreverLista(md, secao, pedidos, citacaoObrigatoria: true);
+                EscreverLista(md, secao, Pedidos(a), citacaoObrigatoria: true);
                 return;
 
             default:
@@ -128,6 +124,22 @@ public static class GeradorDocumento
                 EscreverLista(md, secao, itens, citacaoObrigatoria);
                 return;
         }
+    }
+
+    /// <summary>
+    /// O que se pede: os títulos dos cards (já são o pedido em uma frase) e, depois, as regras que nenhum card cobre.
+    /// Assim, um pedido continua na lista mesmo quando o modelo junta vários num card só. Uma regra está coberta
+    /// quando cita o mesmo momento do vídeo que algum card.
+    /// </summary>
+    internal static IReadOnlyList<ItemCitado> Pedidos(AnaliseVideo a)
+    {
+        var momentosDosCards = a.Cards.SelectMany(c => c.Citacoes)
+            .Where(c => c.Inicio is not null)
+            .Select(c => (c.Inicio, c.DaTela))
+            .ToHashSet();
+        var regrasSemCard = a.RegrasNegocio
+            .Where(r => !r.Citacoes.Any(c => c.Inicio is not null && momentosDosCards.Contains((c.Inicio, c.DaTela))));
+        return a.Cards.Select(c => new ItemCitado(c.Titulo, c.Citacoes)).Concat(regrasSemCard).ToList();
     }
 
     private static void EscreverLista(StringBuilder md, SecaoPerfil secao, IReadOnlyList<ItemCitado> itens, bool citacaoObrigatoria)

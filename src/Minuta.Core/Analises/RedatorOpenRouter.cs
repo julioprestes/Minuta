@@ -17,7 +17,7 @@ public sealed class RedatorOpenRouter(HttpClient http, string apiKey, string mod
     public const string Endereco = OpenRouterChat.Endereco;
 
     /// <summary>Aumente ao mudar o prompt ou o schema: invalida as análises salvas.</summary>
-    public const int VersaoPrompt = 5;
+    public const int VersaoPrompt = 6;
 
     /// <summary>Respostas fora do formato são pedidas de novo uma vez.</summary>
     private const int TentativasDeFormato = 2;
@@ -84,7 +84,9 @@ public sealed class RedatorOpenRouter(HttpClient http, string apiKey, string mod
         - proximo_passo: ação que alguém disse que vai fazer ou que precisa ser feita (inclua quem e quando, se ditos).
         - card: tarefa concreta de desenvolvimento que decorre de um pedido dito, com critérios de aceite verificáveis
           tirados do que foi dito ou mostrado e o caminho até a tela, se aparecer. Algo a confirmar com o cliente
-          é dúvida, não card.
+          é dúvida, não card. UM CARD POR PEDIDO: pedidos distintos (em telas diferentes ou sobre comportamentos
+          diferentes) viram cards separados, nunca um card só. O título é o pedido em uma frase, com a tela onde
+          ele vale (ex.: "Mostrar o total com desconto na tela 'Novo pedido'").
 
         Se vier um "Contexto informado por quem enviou o vídeo": ele não faz parte do vídeo. Use para entender o
         objetivo, mas não o cite. Se o vídeo não confirmar ou contradisser o contexto, registre como dúvida.
@@ -195,7 +197,7 @@ public sealed class RedatorOpenRouter(HttpClient http, string apiKey, string mod
                 ["description"] = "Tarefas de desenvolvimento que decorrem do vídeo.",
                 ["items"] = Objeto(new()
                 {
-                    ["titulo"] = Texto("Título curto da tarefa, começando com verbo."),
+                    ["titulo"] = Texto("O pedido em uma frase, começando com verbo e citando a tela onde vale."),
                     ["descricao"] = Texto("O que precisa ser feito e por quê."),
                     ["criterios_aceite"] = new JsonObject
                     {

@@ -11,7 +11,7 @@ public enum TipoSecao
     ProximosPassos,
     Cards,
 
-    /// <summary>O que se pede, em uma linha por pedido: os títulos dos cards (ou as regras, se não houver cards).</summary>
+    /// <summary>O que se pede, em uma linha por pedido: os títulos dos cards e as regras que nenhum card cobre.</summary>
     Pedidos,
 }
 

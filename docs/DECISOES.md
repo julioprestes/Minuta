@@ -272,6 +272,15 @@ Mudanças:
   - Com fala, no perfil `resumo`: o resumo explica o fluxo, o problema e o que ficou em aberto, com 12 de 12 citações. O perfil `analise` saiu do cache, sem chamar API.
   - Mudo: o resumo descreve as telas e diz que, sem fala, o problema não foi informado.
   - A migração moveu os arquivos antigos dos dois vídeos.
+- **Vídeo real:** aprovado pelo desenvolvedor. O resumo explicou os três pedidos, mas "O que se pede" trouxe só um, porque o modelo juntou tudo num card.
+
+## 2026-11-16 — "O que se pede" com um card por pedido e regras sem card
+
+- **Prompt da análise v6:** um card por pedido. Pedidos em telas diferentes ou sobre comportamentos diferentes viram cards separados, e o título é o pedido em uma frase, com a tela onde vale.
+- **Rede de segurança no código:**
+  - A lista "O que se pede" junta os títulos dos cards e as regras que nenhum card cobre.
+  - Uma regra está coberta quando cita o mesmo momento do vídeo (tempo e origem, fala ou tela) que algum card.
+  - Assim, se o modelo voltar a juntar pedidos, o que ficou só como regra aparece mesmo assim. Não é preciso comparar textos, que o modelo escreve de jeitos diferentes.
 
 ## Limites dos planos gratuitos (consultados em 2026-11-12)
 
