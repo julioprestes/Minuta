@@ -8,8 +8,26 @@ internal sealed record ResultadoProcesso(int CodigoSaida, string Saida, string E
 /// <summary>Roda um executável externo (ffmpeg/ffprobe) e captura a saída. Cancelar mata o processo.</summary>
 internal static class ExecutorProcesso
 {
-    public static async Task<ResultadoProcesso> ExecutarAsync(
-        string executavel, IEnumerable<string> argumentos, CancellationToken cancelamento)
+    public static Task<ResultadoProcesso> ExecutarAsync(
+        string executavel, IEnumerable<string> argumentos, CancellationToken cancelamento) =>
+        ExecutarAsync(executavel, argumentos, async (saida, ct) => await saida.ReadToEndAsync(ct), cancelamento);
+
+    /// <summary>
+    /// Variante que entrega a saída padrão como fluxo de bytes (ex.: quadros crus do ffmpeg), sem guardar tudo
+    /// na memória. O texto de <see cref="ResultadoProcesso.Saida"/> fica vazio.
+    /// </summary>
+    public static Task<ResultadoProcesso> ExecutarLendoBytesAsync(
+        string executavel, IEnumerable<string> argumentos, Func<Stream, CancellationToken, Task> lerSaida,
+        CancellationToken cancelamento) =>
+        ExecutarAsync(executavel, argumentos, async (saida, ct) =>
+        {
+            await lerSaida(saida.BaseStream, ct);
+            return "";
+        }, cancelamento);
+
+    private static async Task<ResultadoProcesso> ExecutarAsync(
+        string executavel, IEnumerable<string> argumentos, Func<StreamReader, CancellationToken, Task<string>> lerSaida,
+        CancellationToken cancelamento)
     {
         var inicio = new ProcessStartInfo(executavel)
         {
@@ -33,15 +51,16 @@ internal static class ExecutorProcesso
                 "Confira a instalação do FFmpeg com \"minuta --checar\".", ex);
         }
 
-        var saida = processo.StandardOutput.ReadToEndAsync(cancelamento);
         var erros = processo.StandardError.ReadToEndAsync(cancelamento);
         try
         {
+            var saida = await lerSaida(processo.StandardOutput, cancelamento);
             await processo.WaitForExitAsync(cancelamento);
-            return new ResultadoProcesso(processo.ExitCode, await saida, await erros);
+            return new ResultadoProcesso(processo.ExitCode, saida, await erros);
         }
-        catch (OperationCanceledException)
+        catch
         {
+            // Cancelado ou falha ao ler a saída: não deixa o ffmpeg rodando (ou travado escrevendo) em segundo plano.
             try { processo.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
             throw;
         }

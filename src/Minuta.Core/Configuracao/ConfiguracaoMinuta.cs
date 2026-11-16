@@ -10,6 +10,7 @@ public sealed record ConfiguracaoMinuta
     public const string VarModeloTranscricao = "GROQ_MODELO_TRANSCRICAO";
     public const string VarOpenRouterApiKey = "OPENROUTER_API_KEY";
     public const string VarModeloAnalise = "OPENROUTER_MODELO_ANALISE";
+    public const string VarModeloVisao = "OPENROUTER_MODELO_VISAO";
     public const string VarIdioma = "MINUTA_IDIOMA";
     public const string VarFfmpegPath = "FFMPEG_PATH";
     public const string VarGlossario = "MINUTA_GLOSSARIO";
@@ -23,6 +24,11 @@ public sealed record ConfiguracaoMinuta
 
     /// <summary>Sem padrão de propósito: a lista de modelos gratuitos muda com frequência.</summary>
     public string? ModeloAnalise { get; init; }
+
+    /// <summary>Modelo que descreve os frames da tela (precisa aceitar imagem). Vazio = o mesmo da análise.</summary>
+    public string? ModeloVisao { get; init; }
+
+    public string? ModeloVisaoEfetivo => ModeloVisao ?? ModeloAnalise;
 
     /// <summary>Código ISO-639-1 enviado ao Whisper.</summary>
     public string Idioma { get; init; } = IdiomaPadrao;
@@ -69,6 +75,7 @@ public sealed record ConfiguracaoMinuta
             ModeloTranscricao = Ler(VarModeloTranscricao) ?? ModeloTranscricaoPadrao,
             OpenRouterApiKey = Ler(VarOpenRouterApiKey),
             ModeloAnalise = Ler(VarModeloAnalise),
+            ModeloVisao = Ler(VarModeloVisao),
             Idioma = Ler(VarIdioma) ?? IdiomaPadrao,
             FfmpegPath = Ler(VarFfmpegPath),
             CaminhoGlossario = caminhoGlossario,

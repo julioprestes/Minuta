@@ -1,5 +1,3 @@
-using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -14,7 +12,7 @@ namespace Minuta.Core.Analises;
 /// </summary>
 public sealed class RedatorOpenRouter(HttpClient http, string apiKey, string modelo)
 {
-    public const string Endereco = "https://openrouter.ai/api/v1/chat/completions";
+    public const string Endereco = OpenRouterChat.Endereco;
 
     /// <summary>Aumente ao mudar o prompt ou o schema: invalida as análises salvas.</summary>
     public const int VersaoPrompt = 1;
@@ -56,7 +54,9 @@ public sealed class RedatorOpenRouter(HttpClient http, string apiKey, string mod
 
         for (var tentativa = 1; ; tentativa++)
         {
-            var resposta = await chamador.EnviarAsync(() => MontarRequisicao(corpoRequisicao), Erro, cancelamento);
+            var resposta = await chamador.EnviarAsync(
+                () => OpenRouterChat.Requisicao(apiKey, corpoRequisicao),
+                falha => OpenRouterChat.Erro(falha, "OPENROUTER_MODELO_ANALISE"), cancelamento);
             try
             {
                 return Interpretar(resposta, transcricao) with { Modelo = modelo, VersaoPrompt = VersaoPrompt };
@@ -82,46 +82,15 @@ public sealed class RedatorOpenRouter(HttpClient http, string apiKey, string mod
             {transcricao.ParaTextoComTempos()}
             """;
 
-        var corpo = new JsonObject
-        {
-            ["model"] = modelo,
-            ["messages"] = new JsonArray(
-                new JsonObject { ["role"] = "system", ["content"] = InstrucoesDoSistema },
-                new JsonObject { ["role"] = "user", ["content"] = usuario }),
-            ["response_format"] = new JsonObject
-            {
-                ["type"] = "json_schema",
-                ["json_schema"] = new JsonObject
-                {
-                    ["name"] = "analise_video",
-                    ["strict"] = true,
-                    ["schema"] = Schema(),
-                },
-            },
-            // Só usa provedores que respeitam o response_format.
-            ["provider"] = new JsonObject { ["require_parameters"] = true },
-            ["temperature"] = 0,
-            ["max_tokens"] = 20000,
-            ["reasoning"] = new JsonObject { ["exclude"] = true },
-        };
-        return corpo.ToJsonString();
-    }
-
-    private HttpRequestMessage MontarRequisicao(string corpo)
-    {
-        var requisicao = new HttpRequestMessage(HttpMethod.Post, Endereco)
-        {
-            Content = new StringContent(corpo, Encoding.UTF8, "application/json"),
-        };
-        requisicao.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-        requisicao.Headers.Add("X-Title", "Minuta");
-        return requisicao;
+        return OpenRouterChat.Corpo(modelo, InstrucoesDoSistema, usuario, "analise_video", Schema(), maxTokens: 20000)
+            .ToJsonString();
     }
 
     /// <summary>Schema estrito. Sem $ref: nem todo provedor aceita, então cada objeto é escrito por extenso.</summary>
     internal static JsonObject Schema()
     {
-        static JsonObject Texto(string descricao) => new() { ["type"] = "string", ["description"] = descricao };
+        static JsonObject Texto(string descricao) => OpenRouterChat.Texto(descricao);
+        static JsonObject Objeto(JsonObject propriedades) => OpenRouterChat.Objeto(propriedades);
 
         static JsonObject Citacoes() => new()
         {
@@ -138,14 +107,6 @@ public sealed class RedatorOpenRouter(HttpClient http, string apiKey, string mod
             ["type"] = "array",
             ["description"] = descricao,
             ["items"] = Objeto(new() { ["texto"] = Texto("O item, em uma frase."), ["citacoes"] = Citacoes() }),
-        };
-
-        static JsonObject Objeto(JsonObject propriedades) => new()
-        {
-            ["type"] = "object",
-            ["properties"] = propriedades,
-            ["required"] = new JsonArray(propriedades.Select(p => (JsonNode)JsonValue.Create(p.Key)!).ToArray()),
-            ["additionalProperties"] = false,
         };
 
         return Objeto(new()
@@ -175,54 +136,15 @@ public sealed class RedatorOpenRouter(HttpClient http, string apiKey, string mod
         });
     }
 
-    private static MinutaException Erro(FalhaHttp falha) => falha.Status switch
-    {
-        400 => new("O OpenRouter recusou a requisição." + falha.Detalhe,
-            "Confira se OPENROUTER_MODELO_ANALISE aceita saída estruturada (response_format / JSON Schema)."),
-        401 => new("A chave do OpenRouter foi recusada (inválida ou expirada).",
-            "Gere outra em https://openrouter.ai/settings/keys e atualize OPENROUTER_API_KEY no .env."),
-        402 => new("O OpenRouter recusou por saldo." + falha.Detalhe,
-            "Com saldo negativo, até os modelos gratuitos falham. Confira em https://openrouter.ai/settings/credits."),
-        403 => new("O OpenRouter negou a requisição." + falha.Detalhe),
-        404 => new("Modelo não encontrado ou sem provedor disponível no OpenRouter." + falha.Detalhe,
-            "Confira OPENROUTER_MODELO_ANALISE (a lista de modelos gratuitos muda) e a privacidade em "
-            + "https://openrouter.ai/settings/privacy: modelos gratuitos podem exigir permitir provedores que registram os dados."),
-        429 => new("Limite de uso do OpenRouter atingido." + falha.Detalhe,
-            (falha.EsperaPedida is { } e ? $"O OpenRouter pede para esperar {e.TotalMinutes:N0} min. " : "")
-            + "Modelos gratuitos: 20 por minuto e 50 por dia sem créditos comprados."),
-        >= 500 => new($"O OpenRouter ou o provedor do modelo está indisponível (HTTP {falha.Status}).",
-            "Tente de novo mais tarde ou troque de modelo."),
-        _ => new($"O OpenRouter recusou a requisição (HTTP {falha.Status})." + falha.Detalhe),
-    };
-
     /// <summary>Lê a resposta do chat completions, valida o JSON da análise e confere as citações.</summary>
     internal static AnaliseVideo Interpretar(string corpo, Transcricao transcricao)
     {
-        string conteudo;
-        try
-        {
-            using var doc = JsonDocument.Parse(corpo);
-            var raiz = doc.RootElement;
-
-            if (raiz.TryGetProperty("error", out var erro))
-                throw new MinutaException("O OpenRouter devolveu um erro: "
-                    + (erro.TryGetProperty("message", out var m) ? m.GetString() : erro.ToString()));
-
-            var escolha = raiz.GetProperty("choices")[0];
-            if (escolha.TryGetProperty("finish_reason", out var fim) && fim.GetString() == "length")
-                throw new RespostaForaDoFormato("a resposta foi cortada por tamanho");
-
-            conteudo = escolha.GetProperty("message").GetProperty("content").GetString() ?? "";
-        }
-        catch (Exception ex) when (ex is JsonException or KeyNotFoundException or IndexOutOfRangeException or InvalidOperationException)
-        {
-            throw new RespostaForaDoFormato("a resposta do OpenRouter não tem o formato de chat completions", ex);
-        }
+        var conteudo = OpenRouterChat.LerConteudo(corpo);
 
         AnaliseBruta? bruta;
         try
         {
-            bruta = JsonSerializer.Deserialize<AnaliseBruta>(SemCercaDeCodigo(conteudo));
+            bruta = JsonSerializer.Deserialize<AnaliseBruta>(conteudo);
         }
         catch (JsonException ex)
         {
@@ -259,19 +181,6 @@ public sealed class RedatorOpenRouter(HttpClient http, string apiKey, string mod
             Origem = transcricao.Origem,
         };
     }
-
-    /// <summary>Alguns modelos embrulham o JSON em ```json ... ``` mesmo com schema.</summary>
-    private static string SemCercaDeCodigo(string conteudo)
-    {
-        var texto = conteudo.Trim();
-        if (!texto.StartsWith("```"))
-            return texto;
-        var inicio = texto.IndexOf('\n');
-        var fim = texto.LastIndexOf("```", StringComparison.Ordinal);
-        return inicio >= 0 && fim > inicio ? texto[(inicio + 1)..fim].Trim() : texto;
-    }
-
-    internal sealed class RespostaForaDoFormato(string mensagem, Exception? causa = null) : Exception(mensagem, causa);
 
     private sealed record AnaliseBruta(
         [property: JsonPropertyName("resumo")] string? Resumo,

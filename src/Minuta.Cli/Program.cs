@@ -58,6 +58,9 @@ static async Task<int> ExecutarAsync(string[] args, CancellationToken cancelamen
     var opcoes = new OpcoesProcessamento(
         Retranscrever: args.Contains("--retranscrever"),
         Reanalisar: args.Contains("--reanalisar"),
+        RefazerFrames: args.Contains("--refazer-frames"),
+        Redescrever: args.Contains("--redescrever"),
+        SemVisao: args.Contains("--sem-visao"),
         Perfil: PerfisDocumento.Obter(LerOpcao(args, "--perfil") ?? PerfisDocumento.Analise.Id));
     var config = ConfiguracaoMinuta.Carregar();
 
@@ -76,6 +79,19 @@ static async Task<int> ExecutarAsync(string[] args, CancellationToken cancelamen
         + (t.Segmentos.Any(s => s.BaixaConfianca) ? $", {t.Segmentos.Count(s => s.BaixaConfianca)} com baixa confiança (?)" : "")
         + ".");
     Console.WriteLine($"  {resultado.CaminhoTranscricaoTexto}");
+
+    if (resultado.Frames is { } f)
+    {
+        Console.WriteLine();
+        Console.WriteLine($"Telas: {f.Frames.Count} frame(s) em {f.Pasta}");
+        if (resultado.Visao is { } v)
+        {
+            Console.WriteLine($"  Descritas por {v.Modelo}: {resultado.CaminhoVisao}");
+            Console.WriteLine("  (ainda não entram na análise; Fase 2, próxima etapa)");
+            foreach (var tela in v.Telas)
+                Console.WriteLine($"  [{Transcricao.FormatarTempo(tela.Tempo)}] {tela.Resumo()}");
+        }
+    }
 
     MostrarAnalise(resultado.Analise, resultado.CaminhoAnalise);
 
@@ -111,6 +127,7 @@ static int Checar()
     Console.WriteLine($"  {ConfiguracaoMinuta.VarModeloTranscricao,-26}{config.ModeloTranscricao}");
     Console.WriteLine($"  {ConfiguracaoMinuta.VarOpenRouterApiKey,-26}{Status(config.OpenRouterApiKey)}");
     Console.WriteLine($"  {ConfiguracaoMinuta.VarModeloAnalise,-26}{config.ModeloAnalise ?? "(não definido)"}");
+    Console.WriteLine($"  {ConfiguracaoMinuta.VarModeloVisao,-26}{config.ModeloVisao ?? (config.ModeloAnalise is null ? "(não definido)" : "(o mesmo da análise)")}");
     Console.WriteLine($"  {ConfiguracaoMinuta.VarIdioma,-26}{config.Idioma}");
     Console.WriteLine($"  {"Glossário",-26}{DescreverGlossario(config.CaminhoGlossario)}");
 
@@ -186,6 +203,9 @@ static void MostrarAjuda()
           --saida <pasta>     onde gravar os arquivos (padrão: pasta do vídeo)
           --retranscrever     ignora a transcrição já salva e transcreve de novo
           --reanalisar        ignora a análise já salva e chama o modelo de novo
+          --refazer-frames    escolhe de novo os frames da tela
+          --redescrever       descreve as telas de novo (chama o modelo de visão)
+          --sem-visao         ignora a tela: nenhuma imagem sai da máquina
         """);
 }
 

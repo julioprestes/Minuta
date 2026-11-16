@@ -4,14 +4,22 @@ using Minuta.Core.Configuracao;
 using Minuta.Core.Documentos;
 using Minuta.Core.Midia;
 using Minuta.Core.Transcricoes;
+using Minuta.Core.Visao;
 
 namespace Minuta.Core;
 
 /// <param name="Retranscrever">Ignora a transcrição salva (e, por consequência, a análise).</param>
 /// <param name="Reanalisar">Ignora a análise salva e chama o modelo de novo.</param>
 /// <param name="Perfil">Formato do documento. Padrão: <see cref="PerfisDocumento.Analise"/>.</param>
-public sealed record OpcoesProcessamento(bool Retranscrever = false, bool Reanalisar = false, PerfilDocumento? Perfil = null);
+/// <param name="RefazerFrames">Ignora os frames já salvos e escolhe de novo.</param>
+/// <param name="Redescrever">Ignora as descrições das telas salvas e chama o modelo de visão de novo.</param>
+/// <param name="SemVisao">Pula a trilha visual (nenhuma imagem sai da máquina; não gasta cota com as telas).</param>
+public sealed record OpcoesProcessamento(
+    bool Retranscrever = false, bool Reanalisar = false, PerfilDocumento? Perfil = null, bool RefazerFrames = false,
+    bool Redescrever = false, bool SemVisao = false);
 
+/// <param name="Frames">Frames escolhidos da tela; null se o arquivo não tem imagem (só áudio) ou com --sem-visao.</param>
+/// <param name="Visao">Descrição das telas; null quando não há frames.</param>
 public sealed record ResultadoProcessamento(
     Transcricao Transcricao,
     string CaminhoTranscricaoTexto,
@@ -19,11 +27,14 @@ public sealed record ResultadoProcessamento(
     AnaliseVideo Analise,
     string CaminhoAnalise,
     bool AnaliseReaproveitada,
-    string CaminhoDocumento);
+    string CaminhoDocumento,
+    FramesExtraidos? Frames,
+    DescricaoVisual? Visao,
+    string? CaminhoVisao);
 
 /// <summary>
 /// Pipeline do Minuta, usado pelo console e, depois, pela interface.
-/// Vídeo → áudio → transcrição → análise → documento .md.
+/// Vídeo → frames da tela (Fase 2, por enquanto só salvos) → áudio → transcrição → análise → documento .md.
 /// Transcrição e análise são salvas e reaproveitadas para não gastar cota das APIs a cada execução;
 /// o documento é sempre refeito (não chama API).
 /// </summary>
@@ -47,6 +58,13 @@ public sealed class ProcessadorMinuta(ConfiguracaoMinuta config, HttpClient http
             throw new MinutaException(
                 $"{ConfiguracaoMinuta.VarOpenRouterApiKey} e {ConfiguracaoMinuta.VarModeloAnalise} são necessários para a análise.",
                 "Preencha no .env e confira com \"minuta --checar\".");
+
+        // Trilha visual. Por enquanto as telas são descritas e salvas; a análise passa a usá-las na próxima etapa.
+        var frames = opcoes.SemVisao ? null : await ObterFramesAsync(video, pastaSaida, opcoes, progresso, cancelamento);
+        var caminhoVisao = frames is null ? null : Path.Combine(pastaSaida, nome + ArquivoVisao.Sufixo);
+        var visao = frames is null || frames.Frames.Count == 0
+            ? null
+            : await ObterVisaoAsync(video, frames, caminhoVisao!, opcoes, progresso, cancelamento);
 
         var (transcricao, transcricaoReaproveitada) = await ObterTranscricaoAsync(
             video, pastaSaida, caminhoJson, caminhoTexto, opcoes, progresso, cancelamento);
@@ -74,7 +92,43 @@ public sealed class ProcessadorMinuta(ConfiguracaoMinuta config, HttpClient http
         File.WriteAllText(caminhoDocumento, documento, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
 
         return new ResultadoProcessamento(
-            transcricao, caminhoTexto, transcricaoReaproveitada, analise!, caminhoAnalise, analiseReaproveitada, caminhoDocumento);
+            transcricao, caminhoTexto, transcricaoReaproveitada, analise!, caminhoAnalise, analiseReaproveitada, caminhoDocumento,
+            frames, visao, visao is null ? null : caminhoVisao);
+    }
+
+    private async Task<DescricaoVisual> ObterVisaoAsync(
+        FileInfo video, FramesExtraidos frames, string caminho, OpcoesProcessamento opcoes,
+        IProgress<string>? progresso, CancellationToken cancelamento)
+    {
+        var modelo = config.ModeloVisaoEfetivo!; // a análise já exige o modelo, então aqui ele existe
+        if (!opcoes.Redescrever
+            && ArquivoVisao.Carregar(caminho, video, modelo, DescritorFramesOpenRouter.VersaoPrompt, frames.Frames) is { } salva)
+        {
+            progresso?.Report("Descrição das telas reaproveitada (use --redescrever para refazer).");
+            return salva;
+        }
+
+        var visao = await new DescritorFramesOpenRouter(http, config.OpenRouterApiKey!, modelo)
+            .DescreverAsync(frames, progresso, cancelamento) with { Origem = OrigemTranscricao.De(video) };
+        ArquivoVisao.Salvar(visao, caminho);
+        return visao;
+    }
+
+    private async Task<FramesExtraidos?> ObterFramesAsync(
+        FileInfo video, string pastaSaida, OpcoesProcessamento opcoes, IProgress<string>? progresso, CancellationToken cancelamento)
+    {
+        var ffmpeg = LocalizadorFfmpeg.Localizar(config.FfmpegPath);
+        var info = await new ExtratorAudio(ffmpeg).InspecionarAsync(video.FullName, cancelamento);
+        if (!info.TemVideo)
+            return null;
+
+        progresso?.Report("Escolhendo os frames da tela...");
+        var frames = await new ExtratorFrames(ffmpeg).ExtrairAsync(
+            video, pastaSaida, refazer: opcoes.RefazerFrames, cancelamento: cancelamento);
+        progresso?.Report(frames.Reaproveitados
+            ? $"Frames reaproveitados: {frames.Frames.Count} (use --refazer-frames para escolher de novo)."
+            : $"Frames: {frames.Frames.Count} salvos.");
+        return frames;
     }
 
     private async Task<(Transcricao, bool Reaproveitada)> ObterTranscricaoAsync(
@@ -124,7 +178,7 @@ public sealed class ProcessadorMinuta(ConfiguracaoMinuta config, HttpClient http
         if (transcricao.Vazia)
             throw new MinutaException(
                 "Nenhuma fala foi reconhecida no áudio.",
-                $"Ouça {audio.Caminho} para conferir se a narração está audível. Vídeos só com a tela serão tratados na Fase 3.");
+                $"Ouça {audio.Caminho} para conferir se a narração está audível. Vídeos só com a tela serão tratados na Fase 2.");
 
         ArquivoTranscricao.Salvar(transcricao, caminhoJson, caminhoTexto);
         return (transcricao, false);

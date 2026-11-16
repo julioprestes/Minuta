@@ -141,6 +141,44 @@ Registro do porquê das escolhas, para retomar o trabalho em qualquer máquina. 
   - Nova ordem de prioridade: ajustes do prompt → perfis personalizados → Fase 3 (trilha visual) → importar transcrição → Fase 2 (áudio longo), esta só se houver necessidade.
   - Isso substitui a ordem anterior (áudio longo antes da trilha visual), que fazia sentido quando reuniões comuns eram um caso central.
 
+## 2026-11-16 — Fases trocadas: trilha visual vira a Fase 2
+
+- **Motivo:** o foco são vídeos de análise, que têm no máximo uns 15 minutos (bem abaixo do limite de cerca de 1h40 de áudio). E apareceu um caso real que só a parte visual resolve: um vídeo sem fala, só com o analista clicando.
+- **Nova numeração:** Fase 2 = trilha visual; Fase 3 = áudio longo, só se houver necessidade.
+- As entradas anteriores deste arquivo usam a numeração antiga (trilha visual = Fase 3, áudio longo = Fase 2).
+- **Objetivo da Fase 2 para vídeos sem fala:** o modelo de visão não conhece o sistema. O documento deve ser **literal e descritivo** (caminho de menus, título das telas, campos, valores, botões e mensagens exatamente como aparecem), para que outra pessoa ou outro chat com o contexto do sistema consiga localizar o problema. Interpretações ficam marcadas como prováveis, e o que o vídeo não mostra vira dúvida.
+
+## 2026-11-16 — Escolha dos frames (Fase 2, etapa 1)
+
+- **Sem biblioteca de imagem:** o ffmpeg entrega quadros de 320×180 em tons de cinza, crus, pela saída padrão, a 2 por segundo. O código compara os bytes. Nenhuma dependência nova e cerca de 15 s para 3,5 min de vídeo.
+- **Métrica:** fração de pixels cuja diferença de brilho passa de 24. Na escala reduzida, o cursor andando muda menos de 0,1% dos pixels; uma janela, um menu ou uma tela nova mudam muito mais.
+- **Regra:** a tela é escolhida quando muda e **assenta** (dois quadros seguidos parados, cerca de 0,5 s), e só se ficou diferente do último frame escolhido (0,2% ou mais). Animações e carregamentos não geram vários frames.
+  - Tela parada por 15 s com alguma mudança pequena (ex.: digitação) gera um frame de intervalo.
+  - O último quadro entra se for diferente, porque costuma mostrar o resultado.
+  - Teto de 60 frames, mantendo o primeiro, o último e as maiores mudanças.
+- **A imagem sai do meio do trecho parado** (+0,25 s), não da borda. No primeiro teste real, o detector achou o menu aberto, mas o JPEG tirado na borda pegava o quadro de antes de o menu abrir.
+- **Teste real** (3,5 min, 1152×720): 35 frames. Os menus e submenus abertos foram capturados, inclusive o caminho completo de um relatório que a transcrição tinha cortado ("relat gerenciais posi posi de t").
+- Os frames ficam ao lado do vídeo, em `<video>.frames/`, fora do git: mostram a tela inteira e podem ter dados reais.
+
+## 2026-11-16 — Descrição das telas (Fase 2, etapa 2)
+
+- **Modelos gratuitos do OpenRouter que aceitam imagem** (lista da API consultada em 2026-11-16):
+
+  | Modelo | JSON Schema estrito | Resultado |
+  |---|---|---|
+  | `thinkingmachines/inkling-2-small:free` | não | **403**: "only available on agentic harnesses". A versão gratuita só funciona em ferramentas de agente listadas pelo OpenRouter, não num app próprio. |
+  | `inclusionai/ling-3.2-flash:free` | sim | **429**: sobrecarregado no provedor ("rate-limited upstream"); lançado em 2026-11-13. Candidato para testar de novo depois. |
+  | `nvidia/nemotron-3.5-super-vl:free` | sim | **Escolhido.** A descrição oficial cita "GUI screenshots". É o mesmo modelo da análise. |
+  | `particle-ai/particle-1:free`, `dots-studio/dots-3-note-preview:free` | sim | não testados (o primeiro é focado em código) |
+  | `google/gemma-4-*:free` | não (só `response_format` simples) | não testados |
+
+- **Teste comparativo** com duas telas sintéticas (menu com submenu e janela de erro): o Nemotron leu o caminho do menu até o item destacado, a mensagem exata e os campos com valores.
+  - **Limitação:** ele às vezes "corrige" o texto da tela (acrescentou o acento em "Modulo"), mesmo com a regra de copiar literalmente. Como não há transcrição da tela para conferir, as descrições não passam por conferência, como as citações da fala.
+- **Envio:** formato de chat completions, com `image_url` em data URL base64 (JPEG). A documentação recomenda texto antes das imagens; cada imagem vai precedida de um rótulo "Frame N [mm:ss]".
+- **Lotes de 10 frames:** ~900 tokens de entrada por imagem de 1152×720. Um vídeo de 35 frames gasta 4 requisições da cota de 50 por dia, mais 1 da análise.
+- **Continuidade:** cada lote leva o resumo da última tela do lote anterior, para a descrição dizer o que mudou.
+- **`--sem-visao`:** pula a trilha visual inteira, para vídeos cuja tela tenha dados sensíveis ou quando a cota estiver curta. A tela costuma mostrar mais dados reais que a fala.
+
 ## Limites dos planos gratuitos (consultados em 2026-11-12)
 
 | Provedor | Limite |

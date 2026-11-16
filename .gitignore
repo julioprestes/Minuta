@@ -490,3 +490,5 @@ CLAUDE.md
 *.analise.json
 glossario.txt
 *.groq.json
+*.frames/
+*.visao.json

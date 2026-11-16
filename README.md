@@ -13,7 +13,7 @@ O foco são os **vídeos de análise e de relato de erro**: alguém mostra um fl
 ```
 vídeo ─▶ trilha de áudio ── FFmpeg ─▶ Whisper (Groq) ─▶ falas [mm:ss] ──┐
       └▶ trilha visual ─── FFmpeg ─▶ modelo de visão ─▶ telas [mm:ss] ──┴▶ linha do tempo
-                           (Fase 3)
+                           (Fase 2)
 linha do tempo ─▶ modelo de linguagem (OpenRouter) ─▶ JSON validado ─▶ conferência das citações ─▶ perfil ─▶ .md
 ```
 
@@ -33,12 +33,12 @@ Perfis personalizados podem ficar em pasta local, fora do repositório.
 | Fase | Entrega | Situação |
 |---|---|---|
 | 1 | Console: vídeo com áudio → transcrição → documento, perfis *Análise* e *Ata* | concluída |
-| 2 | Áudio longo (divisão acima do limite de upload, ~1h40) | quando houver necessidade |
-| 3 | Trilha visual: frames por mudança de tela e por menção na fala, analisados por modelo multimodal | **prioridade** |
+| 2 | Trilha visual: frames por mudança de tela e por menção na fala, analisados por modelo multimodal; também vídeos sem fala | **próxima** |
+| 3 | Áudio longo (divisão acima do limite de upload, ~1h40) | quando houver necessidade |
 | 4 | Interface desktop (WPF) | planejada |
 | depois | **Importar transcrição pronta** (Claude Meetings, `.vtt`/`.srt`) para reuniões, provedores configuráveis, **modo local** (nada sai da máquina), gravação de tela com registro dos cliques | ideias |
 
-Antes da Fase 3: ajustes do prompt para vídeos de análise e perfis personalizados lidos de pasta local.
+Junto com a Fase 2: ajustes do prompt para vídeos de análise. Depois: perfis personalizados lidos de pasta local.
 
 ## Estrutura
 
@@ -65,7 +65,9 @@ dotnet run --project src/Minuta.Cli -- caminho/do/video.mp4
 dotnet run --project src/Minuta.Cli -- caminho/do/video.mp4 --perfil ata
 ```
 
-Ao lado do vídeo ficam `video.minuta.md` (o documento), `video.transcricao.txt` e os arquivos de cache (`.transcricao.json`, `.analise.json`). Transcrição e análise são reaproveitadas: trocar de perfil não chama nenhuma API (`--retranscrever` e `--reanalisar` refazem).
+Ao lado do vídeo ficam `video.minuta.md` (o documento), `video.transcricao.txt`, a pasta `video.frames/` com as telas escolhidas e os arquivos de cache (`.transcricao.json`, `.visao.json`, `.analise.json`). Tudo é reaproveitado: trocar de perfil não chama nenhuma API (`--retranscrever`, `--redescrever` e `--reanalisar` refazem cada parte).
+
+**Telas (Fase 2, em andamento).** O Minuta escolhe os frames em que a tela muda e um modelo de visão descreve cada um (janela, caminho do menu, campos, mensagens). Use `--sem-visao` para não enviar nenhuma imagem.
 
 **Glossário (opcional).** Se o Whisper erra siglas ou nomes do seu dia a dia, liste os termos certos em `glossario.txt` ao lado do `.env`, um por linha (modelo em `glossario.exemplo.txt`). O arquivo fica fora do git. Mudar o glossário faz o vídeo ser transcrito de novo.
 
@@ -77,4 +79,4 @@ dotnet test
 
 ## Privacidade
 
-O áudio vai para o Groq e o texto para o OpenRouter; modelos gratuitos podem ter política de dados diferente da dos pagos (inclusive uso para treino). Use apenas vídeos sem dados sensíveis, ou um plano com retenção zero, ou — quando existir — o modo local.
+O áudio vai para o Groq; o texto e as imagens das telas, para o OpenRouter. Modelos gratuitos podem ter política de dados diferente da dos pagos (inclusive uso para treino). A tela costuma mostrar mais dados que a fala: use `--sem-visao` quando ela tiver dados sensíveis. Use apenas vídeos sem dados sensíveis, ou um plano com retenção zero, ou — quando existir — o modo local.
